@@ -1,0 +1,13 @@
+# Secretos (service_role, connection string) — NUNCA versionar
+.env.local
+.env
+
+# macOS
+.DS_Store
+
+# Editores
+.vscode/
+.idea/
+
+# Logs
+*.log

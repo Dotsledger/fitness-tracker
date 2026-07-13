@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
+  <title>Fitness Tracker</title>
+  <meta name="description" content="Seguimiento personal de entrenamiento de fuerza y nutrición." />
+  <meta name="robots" content="noindex, nofollow" />
+
+  <!-- PWA -->
+  <link rel="manifest" href="./manifest.json" />
+  <meta name="theme-color" content="#0f1420" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Fitness" />
+  <link rel="apple-touch-icon" href="./icons/icon-192.png" />
+  <link rel="icon" type="image/png" href="./icons/icon-192.png" />
+
+  <link rel="stylesheet" href="./css/styles.css" />
+
+  <!-- Librerías externas (globals). El service worker las cachea. -->
+  <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <span class="topbar__brand">🏋 Fitness Tracker</span>
+  </header>
+
+  <div id="app"></div>
+
+  <noscript>Esta aplicación necesita JavaScript.</noscript>
+
+  <!-- Esperamos a que los globals (defer) estén listos antes del módulo. -->
+  <script type="module">
+    function ready() {
+      return window.supabase && window.Chart;
+    }
+    function start() {
+      import("./js/app.js").catch((e) => {
+        document.getElementById("app").innerHTML =
+          '<div class="empty"><div class="empty__title">Error al iniciar</div><div class="empty__sub">' +
+          (e && e.message ? e.message : e) + "</div></div>";
+        console.error(e);
+      });
+    }
+    if (ready()) start();
+    else window.addEventListener("load", start);
+  </script>
+</body>
+</html>
