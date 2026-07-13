@@ -7,7 +7,7 @@
    Sube CACHE_VERSION cuando cambies archivos del shell para invalidar la cache.
    ========================================================================== */
 
-const CACHE_VERSION = "ft-shell-v2";
+const CACHE_VERSION = "ft-shell-v3";
 
 // Archivos del shell (rutas relativas al scope del SW).
 const SHELL = [
@@ -22,8 +22,6 @@ const SHELL = [
   "./js/utils.js",
   "./js/macros.js",
   "./js/charts.js",
-  "./js/auth.js",
-  "./js/views/login.js",
   "./js/views/dashboard.js",
   "./js/views/routine.js",
   "./js/views/workout.js",

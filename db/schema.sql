@@ -121,12 +121,10 @@ create index if not exists idx_workout_sets_exercise on workout_sets (exercise_i
 -- ============================================================================
 -- Row Level Security
 -- ============================================================================
--- La app tiene login (Supabase Auth, código OTP por email). Los datos quedan
--- accesibles SOLO al usuario autenticado cuyo email esté en la allowlist de la
--- función is_authorized(). El rol "anon" (sin sesión) no puede leer ni escribir
--- nada — la anon key pública del frontend es inútil por sí sola.
---
--- Para cambiar/añadir el email autorizado: edita el array de is_authorized().
+-- La app NO tiene login (decisión consciente, un solo usuario). El frontend usa
+-- el rol "anon". Activamos RLS con una política EXPLÍCITA de acceso total a anon
+-- (no queda abierto "por defecto"). No es seguridad fuerte: la protección real
+-- es que la URL no está indexada (robots.txt) y que solo tú la conoces.
 -- ============================================================================
 
 alter table profile            enable row level security;
@@ -137,19 +135,7 @@ alter table routine_exercises  enable row level security;
 alter table workout_sessions   enable row level security;
 alter table workout_sets       enable row level security;
 
--- Allowlist de emails autorizados. search_path='' por seguridad (linter).
-create or replace function public.is_authorized()
-returns boolean
-language sql
-stable
-set search_path = ''
-as $$
-  select coalesce(auth.jwt() ->> 'email', '') = any (array[
-    'fernandopascual@seedtag.com'   -- <-- tu email autorizado
-  ]);
-$$;
-
--- Política única por tabla: acceso total solo si is_authorized().
+-- Política única por tabla: acceso total a anon + authenticated.
 do $$
 declare
   t text;
@@ -159,14 +145,14 @@ declare
   ];
 begin
   foreach t in array tables loop
-    execute format('drop policy if exists "anon_full_access" on %I', t);
     execute format('drop policy if exists "authorized_full_access" on %I', t);
+    execute format('drop policy if exists "anon_full_access" on %I', t);
     execute format(
-      'create policy "authorized_full_access" on %I
+      'create policy "anon_full_access" on %I
          for all
-         to authenticated
-         using (public.is_authorized())
-         with check (public.is_authorized())', t);
+         to anon, authenticated
+         using (true)
+         with check (true)', t);
   end loop;
 end $$;
 

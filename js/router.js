@@ -73,19 +73,7 @@ function updateActiveNav(path) {
   });
 }
 
-let started = false;
-
-// Idempotente: registra el listener de hashchange una sola vez. Llamadas
-// posteriores solo re-renderizan la ruta actual (útil al re-montar tras login).
 export function startRouter() {
-  if (!started) {
-    window.addEventListener("hashchange", render);
-    started = true;
-  }
-  render();
-}
-
-// Re-renderiza la ruta actual bajo demanda.
-export function renderCurrent() {
+  window.addEventListener("hashchange", render);
   render();
 }

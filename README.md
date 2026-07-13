@@ -198,13 +198,11 @@ Si la última medición no tiene `body_fat_pct`, no se puede calcular BMR/TDEE (
 
 ## Seguridad (resumen honesto)
 
-- **Login con Supabase Auth (código OTP por email, sin contraseña).** Al abrir la app se pide el email → llega un código de 6 dígitos → sesión iniciada y persistida (localStorage).
-- **Los datos están bloqueados por RLS** a la cuenta autorizada: la función `is_authorized()` comprueba que el email del JWT esté en la allowlist. Sin sesión válida, el rol `anon` **no puede leer ni escribir nada** — la anon key pública del frontend es inútil por sí sola. Para cambiar el email autorizado, edita el array de `is_authorized()` en [`db/schema.sql`](db/schema.sql) y re-aplícalo.
-- El repo es público (necesario para GitHub Pages gratis), pero como la anon key no da acceso sin login, exponerla no compromete los datos.
+- **No hay login** (decisión consciente, un solo usuario). Cualquiera con la URL puede leer/escribir vía la anon key (las políticas RLS dan acceso total a `anon`).
+- Capas reales de protección: la URL no está indexada (`robots.txt`) y solo tú la conoces. El repo es público (necesario para GitHub Pages gratis), así que **no compartas la URL** con nadie a quien no quieras dar acceso.
 - La `service_role` (que salta RLS) vive **solo** en `.env.local`, nunca en el frontend ni en git.
-- El envío de códigos usa el email por defecto de Supabase (rate-limit ~2-4/hora). Para uso intensivo, configura un SMTP propio en el dashboard (Auth → Emails).
+- Si algún día quieres privacidad, la vía es añadir login con Supabase Auth y ligar el RLS al usuario autenticado.
 
 ## Pendiente de decidir contigo
 
 - Cargar tus ejercicios y días de rutina reales (a mano en la app o por SQL).
-- (Opcional) SMTP propio para los emails de login si el de por defecto se queda corto.
