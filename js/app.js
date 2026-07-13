@@ -67,9 +67,19 @@ function boot() {
 }
 
 // Registrar el service worker (PWA). Ruta relativa para GitHub Pages.
+// Auto-actualización: cuando entra un SW nuevo y toma el control, recargamos
+// una sola vez para que el cliente nunca se quede con una versión vieja.
 if ("serviceWorker" in navigator) {
+  let refreshing = false;
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (refreshing) return;
+    refreshing = true;
+    window.location.reload();
+  });
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./sw.js").catch((e) => console.warn("SW no registrado:", e));
+    navigator.serviceWorker.register("./sw.js")
+      .then((reg) => reg.update())
+      .catch((e) => console.warn("SW no registrado:", e));
   });
 }
 

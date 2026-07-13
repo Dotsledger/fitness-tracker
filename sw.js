@@ -1,15 +1,13 @@
 /* ==========================================================================
-   Service Worker · cache del "shell" de la app.
-   Los DATOS nunca se cachean: siempre van por red a Supabase.
-   Estrategia:
-     - Peticiones a Supabase o cross-origin de datos -> network only.
-     - Assets del shell (mismo origen) + CDNs de librerías -> stale-while-revalidate.
-   Sube CACHE_VERSION cuando cambies archivos del shell para invalidar la cache.
+   Service Worker · estrategia NETWORK-FIRST para el shell.
+   Con internet siempre sirve lo último (evita quedarse con versiones viejas
+   cacheadas); sin internet, cae a la última copia en cache. Los DATOS van
+   siempre por red a Supabase (nunca se cachean).
+   Sube CACHE_VERSION al cambiar el shell.
    ========================================================================== */
 
-const CACHE_VERSION = "ft-shell-v3";
+const CACHE_VERSION = "ft-shell-v4";
 
-// Archivos del shell (rutas relativas al scope del SW).
 const SHELL = [
   "./",
   "./index.html",
@@ -32,20 +30,21 @@ const SHELL = [
   "./icons/icon-512.png",
 ];
 
-// Librerías externas que también cacheamos para que la app abra offline.
 const CDN_HOSTS = ["cdn.jsdelivr.net"];
 
 self.addEventListener("install", (event) => {
+  // Activa la nueva versión de inmediato, sin esperar a cerrar pestañas.
+  self.skipWaiting();
   event.waitUntil(
-    caches.open(CACHE_VERSION).then((cache) => cache.addAll(SHELL)).then(() => self.skipWaiting())
+    caches.open(CACHE_VERSION).then((cache) => cache.addAll(SHELL)).catch(() => {})
   );
 });
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE_VERSION).map((k) => caches.delete(k)))
-    ).then(() => self.clients.claim())
+    caches.keys()
+      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE_VERSION).map((k) => caches.delete(k))))
+      .then(() => self.clients.claim())
   );
 });
 
@@ -55,27 +54,24 @@ self.addEventListener("fetch", (event) => {
 
   const url = new URL(req.url);
 
-  // Datos de Supabase (o cualquier API *.supabase.co): SIEMPRE red, sin cache.
-  if (url.hostname.endsWith("supabase.co") || url.hostname.endsWith("supabase.in")) {
-    return; // deja pasar a la red por defecto
-  }
+  // Datos de Supabase: SIEMPRE red, sin tocar cache.
+  if (url.hostname.endsWith("supabase.co") || url.hostname.endsWith("supabase.in")) return;
 
   const sameOrigin = url.origin === self.location.origin;
   const isCdn = CDN_HOSTS.includes(url.hostname);
+  if (!sameOrigin && !isCdn) return;
 
-  if (!sameOrigin && !isCdn) return; // otras terceras partes: red normal
-
-  // stale-while-revalidate para shell + CDNs.
+  // Network-first: intenta la red; si funciona, actualiza cache y devuelve.
+  // Si falla (offline), devuelve lo que haya en cache.
   event.respondWith(
-    caches.open(CACHE_VERSION).then(async (cache) => {
-      const cached = await cache.match(req);
-      const network = fetch(req)
-        .then((res) => {
-          if (res && res.status === 200) cache.put(req, res.clone());
-          return res;
-        })
-        .catch(() => cached);
-      return cached || network;
-    })
+    fetch(req)
+      .then((res) => {
+        if (res && res.status === 200) {
+          const copy = res.clone();
+          caches.open(CACHE_VERSION).then((cache) => cache.put(req, copy));
+        }
+        return res;
+      })
+      .catch(() => caches.match(req))
   );
 });
