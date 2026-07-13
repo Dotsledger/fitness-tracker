@@ -16,7 +16,11 @@ export const CONFIGURED =
   !SUPABASE_URL.includes("TU-PROYECTO") && !SUPABASE_ANON_KEY.includes("TU_ANON_KEY");
 
 export const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-  auth: { persistSession: false },
+  auth: {
+    persistSession: true,      // guarda la sesión en localStorage (clave para PWA)
+    autoRefreshToken: true,
+    detectSessionInUrl: false, // usamos OTP por código, no magic-link con redirect
+  },
 });
 
 // Envuelve una llamada de Supabase, lanzando el error si lo hay.

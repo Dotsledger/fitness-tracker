@@ -121,16 +121,12 @@ create index if not exists idx_workout_sets_exercise on workout_sets (exercise_i
 -- ============================================================================
 -- Row Level Security
 -- ============================================================================
--- Activamos RLS en todas las tablas y creamos políticas EXPLÍCITAS que dan
--- acceso completo al rol "anon" (el que usa la app sin login). No es seguridad
--- fuerte — es una decisión consciente de un solo usuario. Las capas reales de
--- protección son: (1) la URL no está indexada (robots.txt), (2) las claves no
--- se publican en repos, (3) Supabase limita el rate.
+-- La app tiene login (Supabase Auth, código OTP por email). Los datos quedan
+-- accesibles SOLO al usuario autenticado cuyo email esté en la allowlist de la
+-- función is_authorized(). El rol "anon" (sin sesión) no puede leer ni escribir
+-- nada — la anon key pública del frontend es inútil por sí sola.
 --
--- Si en el futuro quieres endurecerlo sin añadir login completo, la vía típica
--- es mover TODA la escritura detrás de la service_role (que ya usas por
--- terminal) y dejar al frontend solo lectura, o exigir una cabecera secreta
--- vía una función SECURITY DEFINER. De momento: acceso total a anon.
+-- Para cambiar/añadir el email autorizado: edita el array de is_authorized().
 -- ============================================================================
 
 alter table profile            enable row level security;
@@ -141,8 +137,19 @@ alter table routine_exercises  enable row level security;
 alter table workout_sessions   enable row level security;
 alter table workout_sets       enable row level security;
 
--- Helper: crea (o recrea) una política de acceso total para anon + authenticated.
--- Postgres no tiene "create policy if not exists", así que hacemos drop + create.
+-- Allowlist de emails autorizados. search_path='' por seguridad (linter).
+create or replace function public.is_authorized()
+returns boolean
+language sql
+stable
+set search_path = ''
+as $$
+  select coalesce(auth.jwt() ->> 'email', '') = any (array[
+    'fernandopascual@seedtag.com'   -- <-- tu email autorizado
+  ]);
+$$;
+
+-- Política única por tabla: acceso total solo si is_authorized().
 do $$
 declare
   t text;
@@ -153,12 +160,13 @@ declare
 begin
   foreach t in array tables loop
     execute format('drop policy if exists "anon_full_access" on %I', t);
+    execute format('drop policy if exists "authorized_full_access" on %I', t);
     execute format(
-      'create policy "anon_full_access" on %I
+      'create policy "authorized_full_access" on %I
          for all
-         to anon, authenticated
-         using (true)
-         with check (true)', t);
+         to authenticated
+         using (public.is_authorized())
+         with check (public.is_authorized())', t);
   end loop;
 end $$;
 
