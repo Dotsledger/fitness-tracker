@@ -257,6 +257,7 @@ function exerciseBlock(session, { pe, prefill, fromLast, history = [] }) {
     target ? el("span", { class: "chip" }, target) : null,
     el("span", { class: "chip chip--rest" }, `⏱ ${restSec}s`),
   ]));
+  if (pe.notes) card.append(el("div", { class: "note-line" }, pe.notes));
   if (prefill.length && fromLast) {
     card.append(el("div", { class: "muted small" }, "Pre-rellenado con la última vez ✎ supera tus marcas"));
   }

@@ -139,6 +139,7 @@ function plannedRow(pe, planned, idx, allDays, root) {
         pe.target_rest_sec ? ` · ⏱ ${pe.target_rest_sec}s` : "",
         ex.muscle_group ? " · " + ex.muscle_group : "",
       ].join("")),
+      pe.notes ? el("div", { class: "list-row__sub note-line" }, pe.notes) : null,
     ]),
     el("div", { class: "list-row__actions" }, [
       el("button", { class: "icon-btn", title: "Subir", on: { click: () => reorderPlanned(planned, idx, -1, root) } }, "▲"),

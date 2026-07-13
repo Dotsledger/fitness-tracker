@@ -6,7 +6,7 @@
    Sube CACHE_VERSION al cambiar el shell.
    ========================================================================== */
 
-const CACHE_VERSION = "ft-shell-v5";
+const CACHE_VERSION = "ft-shell-v6";
 
 const SHELL = [
   "./",

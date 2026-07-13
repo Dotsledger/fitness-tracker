@@ -267,6 +267,14 @@ input[type="checkbox"] { width: 24px; height: 24px; min-height: 0; accent-color:
 .set-check { display: flex; justify-content: center; }
 .set-in--rpe { font-size: 0.9rem; }
 
+.note-line {
+  font-size: 0.85rem;
+  color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
+  border-radius: var(--radius-sm);
+  padding: 4px 10px;
+  margin: 2px 0 8px;
+}
 .chip--rest { border-color: var(--primary); color: var(--primary); }
 .btn--rest { border-color: var(--primary); color: var(--primary); }
 
