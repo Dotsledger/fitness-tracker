@@ -14,6 +14,7 @@ import {
   el, clear, loading, today, fmtDate, toast, showError, confirmAction, emptyState,
 } from "../utils.js";
 import { navigate } from "../router.js";
+import { exerciseIcon } from "../exercise-icons.js";
 
 // ============================================================================
 // Temporizador de descanso · barra flotante con cuenta atrás, +/- 15s,
@@ -253,9 +254,14 @@ function exerciseBlock(session, { pe, prefill, fromLast, history = [] }) {
   const restSec = pe.target_rest_sec || 90;
   const target = [pe.target_sets ? `${pe.target_sets} series` : null, pe.target_reps].filter(Boolean).join(" × ");
   card.append(el("div", { class: "exercise-block__head" }, [
-    el("h2", { class: "card__title" }, ex.name || "(ejercicio)"),
-    target ? el("span", { class: "chip" }, target) : null,
-    el("span", { class: "chip chip--rest" }, `⏱ ${restSec}s`),
+    exerciseIcon(ex.name),
+    el("div", { class: "exercise-block__headmain" }, [
+      el("h2", { class: "card__title" }, ex.name || "(ejercicio)"),
+      el("div", { class: "exercise-block__chips" }, [
+        target ? el("span", { class: "chip" }, target) : null,
+        el("span", { class: "chip chip--rest" }, `⏱ ${restSec}s`),
+      ]),
+    ]),
   ]));
   if (pe.notes) card.append(el("div", { class: "note-line" }, pe.notes));
   if (prefill.length && fromLast) {

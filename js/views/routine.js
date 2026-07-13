@@ -1,9 +1,13 @@
 // ============================================================================
 // Vista: Rutina (días + asignación de ejercicios)
+// Reordenar: arrastrando el tirador (⋮⋮). Acciones: menú ⋯ por fila/día.
 // ============================================================================
 
 import { RoutineDays, RoutineExercises, Exercises } from "../db.js";
 import { el, clear, loading, toast, showError, confirmAction, emptyState } from "../utils.js";
+import { actionMenu, dragHandle, kebabButton } from "../ui.js";
+import { makeSortable } from "../dnd.js";
+import { exerciseIcon } from "../exercise-icons.js";
 
 export async function renderRoutine(root) {
   loading(root);
@@ -11,7 +15,6 @@ export async function renderRoutine(root) {
     RoutineDays.list({ includeInactive: true }),
     Exercises.list(),
   ]);
-  // Cargar los ejercicios de cada día en paralelo
   const perDay = await Promise.all(days.map((d) => RoutineExercises.byDay(d.id)));
 
   clear(root);
@@ -46,43 +49,70 @@ export async function renderRoutine(root) {
       "No hay ejercicios en el catálogo. Ve a Ejercicios y crea algunos para poder asignarlos."));
   }
 
-  // ---- Un card por día ----------------------------------------------------
-  days.forEach((day, i) => {
-    root.append(dayCard(day, perDay[i], days, catalog, root));
+  // ---- Días (arrastrables por su tirador) ----------------------------------
+  const daysHost = el("div", { class: "days-host" });
+  days.forEach((day, i) => daysHost.append(dayCard(day, perDay[i], days, catalog, root)));
+  root.append(daysHost);
+  makeSortable(daysHost, {
+    handle: ".drag-day",
+    onReorder: async (cards) => {
+      try {
+        await Promise.all(cards.map((c, i) => RoutineDays.update(c.dataset.dayId, { day_order: i + 1 })));
+      } catch (e) { showError(e); renderRoutine(root); }
+    },
   });
 }
 
+// ---------------------------------------------------------------------------
 function dayCard(day, planned, allDays, catalog, root) {
-  const card = el("div", { class: "card" + (day.is_active ? "" : " card--muted") });
+  const card = el("div", {
+    class: "card day-card" + (day.is_active ? "" : " card--muted"),
+    dataset: { dayId: day.id },
+  });
 
-  // Cabecera con acciones de día
-  const header = el("div", { class: "day-head" }, [
-    el("h2", { class: "card__title" }, `${day.name}${day.is_active ? "" : " (inactivo)"}`),
-    el("div", { class: "list-row__actions" }, [
-      el("button", { class: "icon-btn", title: "Subir", on: { click: () => reorderDay(day, allDays, -1, root) } }, "▲"),
-      el("button", { class: "icon-btn", title: "Bajar", on: { click: () => reorderDay(day, allDays, +1, root) } }, "▼"),
-      el("button", { class: "icon-btn", title: "Renombrar", on: { click: () => renameDay(day, root) } }, "✎"),
-      el("button", {
-        class: "icon-btn", title: day.is_active ? "Desactivar" : "Activar",
-        on: { click: async () => { try { await RoutineDays.update(day.id, { is_active: !day.is_active }); renderRoutine(root); } catch (e) { showError(e); } } },
-      }, day.is_active ? "⏸" : "▶"),
-      el("button", {
-        class: "icon-btn danger", title: "Eliminar día",
-        on: { click: async () => {
-          if (!confirmAction(`¿Eliminar el día "${day.name}"? Se borran sus asignaciones (no el historial).`)) return;
-          try { await RoutineDays.remove(day.id); toast("Día eliminado"); renderRoutine(root); } catch (e) { showError(e); }
-        } },
-      }, "🗑"),
-    ]),
-  ]);
-  card.append(header);
+  const kebab = kebabButton("Opciones del día");
+  kebab.addEventListener("click", () => actionMenu(kebab, [
+    { icon: "✎", label: "Renombrar", onClick: () => renameDay(day, root) },
+    {
+      icon: day.is_active ? "⏸" : "▶",
+      label: day.is_active ? "Desactivar" : "Activar",
+      onClick: async () => {
+        try { await RoutineDays.update(day.id, { is_active: !day.is_active }); renderRoutine(root); }
+        catch (e) { showError(e); }
+      },
+    },
+    {
+      icon: "🗑", label: "Eliminar día", danger: true,
+      onClick: async () => {
+        if (!confirmAction(`¿Eliminar el día "${day.name}"? Se borran sus asignaciones (no el historial).`)) return;
+        try { await RoutineDays.remove(day.id); toast("Día eliminado"); renderRoutine(root); }
+        catch (e) { showError(e); }
+      },
+    },
+  ], { title: day.name }));
 
-  // Lista de ejercicios planificados
+  card.append(el("div", { class: "day-head" }, [
+    dragHandle("drag-day"),
+    el("h2", { class: "card__title day-head__title" }, `${day.name}${day.is_active ? "" : " (inactivo)"}`),
+    kebab,
+  ]));
+
+  const rowsHost = el("div", { class: "rows-host" });
   if (!planned.length) {
-    card.append(el("p", { class: "muted" }, "Sin ejercicios asignados."));
+    rowsHost.append(el("p", { class: "muted" }, "Sin ejercicios asignados."));
   } else {
-    planned.forEach((pe, idx) => {
-      card.append(plannedRow(pe, planned, idx, allDays, root));
+    planned.forEach((pe) => rowsHost.append(plannedRow(pe, allDays, root)));
+  }
+  card.append(rowsHost);
+
+  if (planned.length > 1) {
+    makeSortable(rowsHost, {
+      handle: ".drag-ex",
+      onReorder: async (rows) => {
+        try {
+          await Promise.all(rows.map((r, i) => RoutineExercises.update(r.dataset.reId, { exercise_order: i + 1 })));
+        } catch (e) { showError(e); renderRoutine(root); }
+      },
     });
   }
 
@@ -116,46 +146,50 @@ function dayCard(day, planned, allDays, catalog, root) {
   return card;
 }
 
-function plannedRow(pe, planned, idx, allDays, root) {
+// ---------------------------------------------------------------------------
+function plannedRow(pe, allDays, root) {
   const ex = pe.exercise || {};
   const target = [pe.target_sets ? `${pe.target_sets} series` : null, pe.target_reps].filter(Boolean).join(" × ");
+  const sub = [
+    target || "sin objetivo",
+    pe.target_rest_sec ? `⏱ ${pe.target_rest_sec}s` : null,
+    ex.muscle_group || null,
+  ].filter(Boolean).join(" · ");
 
-  // Selector para mover a otro día
-  const moveSel = el("select", { class: "move-sel", title: "Mover a otro día" });
-  moveSel.append(el("option", { value: "" }, "Mover a…"));
-  allDays.filter((d) => d.id !== pe.routine_day_id).forEach((d) =>
-    moveSel.append(el("option", { value: d.id }, d.name)));
-  moveSel.addEventListener("change", async () => {
-    if (!moveSel.value) return;
-    try { await RoutineExercises.update(pe.id, { routine_day_id: moveSel.value }); toast("Movido"); renderRoutine(root); }
-    catch (e) { showError(e); }
-  });
+  const kebab = kebabButton("Opciones del ejercicio");
+  kebab.addEventListener("click", () => actionMenu(kebab, [
+    { icon: "✎", label: "Editar objetivo", onClick: () => editTarget(pe, root) },
+    {
+      icon: "⇄", label: "Mover a…",
+      children: allDays.filter((d) => d.id !== pe.routine_day_id).map((d) => ({
+        label: d.name,
+        onClick: async () => {
+          try { await RoutineExercises.update(pe.id, { routine_day_id: d.id }); toast("Movido a " + d.name); renderRoutine(root); }
+          catch (e) { showError(e); }
+        },
+      })),
+    },
+    {
+      icon: "✕", label: "Quitar del día", danger: true,
+      onClick: async () => {
+        try { await RoutineExercises.remove(pe.id); renderRoutine(root); } catch (e) { showError(e); }
+      },
+    },
+  ], { title: ex.name || "Ejercicio" }));
 
-  return el("div", { class: "list-row" }, [
+  return el("div", { class: "list-row", dataset: { reId: pe.id } }, [
+    dragHandle("drag-ex"),
+    exerciseIcon(ex.name),
     el("div", { class: "list-row__main" }, [
       el("div", { class: "list-row__title" }, ex.name || "(ejercicio borrado)"),
-      el("div", { class: "list-row__sub" }, [
-        target || "sin objetivo",
-        pe.target_rest_sec ? ` · ⏱ ${pe.target_rest_sec}s` : "",
-        ex.muscle_group ? " · " + ex.muscle_group : "",
-      ].join("")),
+      el("div", { class: "list-row__sub" }, sub),
       pe.notes ? el("div", { class: "list-row__sub note-line" }, pe.notes) : null,
     ]),
-    el("div", { class: "list-row__actions" }, [
-      el("button", { class: "icon-btn", title: "Subir", on: { click: () => reorderPlanned(planned, idx, -1, root) } }, "▲"),
-      el("button", { class: "icon-btn", title: "Bajar", on: { click: () => reorderPlanned(planned, idx, +1, root) } }, "▼"),
-      el("button", { class: "icon-btn", title: "Editar objetivo", on: { click: () => editTarget(pe, root) } }, "✎"),
-      moveSel,
-      el("button", {
-        class: "icon-btn danger", title: "Quitar del día",
-        on: { click: async () => {
-          try { await RoutineExercises.remove(pe.id); renderRoutine(root); } catch (e) { showError(e); }
-        } },
-      }, "✕"),
-    ]),
+    kebab,
   ]);
 }
 
+// ---------------------------------------------------------------------------
 function editTarget(pe, root) {
   const sets = prompt("Series objetivo", pe.target_sets ?? "");
   if (sets == null) return;
@@ -175,33 +209,4 @@ async function renameDay(day, root) {
   if (name == null || !name.trim()) return;
   try { await RoutineDays.update(day.id, { name: name.trim() }); renderRoutine(root); }
   catch (e) { showError(e); }
-}
-
-// Intercambia day_order con el vecino.
-async function reorderDay(day, allDays, dir, root) {
-  const sorted = [...allDays].sort((a, b) => (a.day_order || 0) - (b.day_order || 0));
-  const i = sorted.findIndex((d) => d.id === day.id);
-  const j = i + dir;
-  if (j < 0 || j >= sorted.length) return;
-  const a = sorted[i], b = sorted[j];
-  try {
-    await Promise.all([
-      RoutineDays.update(a.id, { day_order: b.day_order }),
-      RoutineDays.update(b.id, { day_order: a.day_order }),
-    ]);
-    renderRoutine(root);
-  } catch (e) { showError(e); }
-}
-
-async function reorderPlanned(planned, idx, dir, root) {
-  const j = idx + dir;
-  if (j < 0 || j >= planned.length) return;
-  const a = planned[idx], b = planned[j];
-  try {
-    await Promise.all([
-      RoutineExercises.update(a.id, { exercise_order: b.exercise_order }),
-      RoutineExercises.update(b.id, { exercise_order: a.exercise_order }),
-    ]);
-    renderRoutine(root);
-  } catch (e) { showError(e); }
 }

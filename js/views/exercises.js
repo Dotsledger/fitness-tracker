@@ -4,6 +4,8 @@
 
 import { Exercises } from "../db.js";
 import { el, clear, loading, toast, showError, confirmAction, emptyState } from "../utils.js";
+import { actionMenu, kebabButton } from "../ui.js";
+import { exerciseIcon } from "../exercise-icons.js";
 
 export async function renderExercises(root) {
   loading(root);
@@ -75,31 +77,36 @@ function addCard(root) {
 
 function exerciseRow(ex, root) {
   const meta = [ex.equipment, ex.notes].filter(Boolean).join(" · ");
-  const row = el("div", { class: "list-row" + (ex.is_active ? "" : " list-row--muted") }, [
+
+  const kebab = kebabButton("Opciones del ejercicio");
+  kebab.addEventListener("click", () => actionMenu(kebab, [
+    { icon: "✎", label: "Editar", onClick: () => editExercise(ex, root) },
+    {
+      icon: ex.is_active ? "⏸" : "▶",
+      label: ex.is_active ? "Desactivar (ocultar sin borrar)" : "Activar",
+      onClick: async () => {
+        try { await Exercises.update(ex.id, { is_active: !ex.is_active }); renderExercises(root); }
+        catch (err) { showError(err); }
+      },
+    },
+    {
+      icon: "🗑", label: "Eliminar", danger: true,
+      onClick: async () => {
+        if (!confirmAction(`¿Eliminar "${ex.name}"? Se quitará también de las rutinas. El historial de series se conserva.`)) return;
+        try { await Exercises.remove(ex.id); toast("Eliminado"); renderExercises(root); }
+        catch (err) { showError(err); }
+      },
+    },
+  ], { title: ex.name }));
+
+  return el("div", { class: "list-row" + (ex.is_active ? "" : " list-row--muted") }, [
+    exerciseIcon(ex.name),
     el("div", { class: "list-row__main" }, [
       el("div", { class: "list-row__title" }, ex.name + (ex.is_active ? "" : " (inactivo)")),
       meta ? el("div", { class: "list-row__sub" }, meta) : null,
     ]),
-    el("div", { class: "list-row__actions" }, [
-      el("button", { class: "icon-btn", title: "Editar", on: { click: () => editExercise(ex, root) } }, "✎"),
-      el("button", {
-        class: "icon-btn", title: ex.is_active ? "Desactivar" : "Activar",
-        on: { click: async () => {
-          try { await Exercises.update(ex.id, { is_active: !ex.is_active }); renderExercises(root); }
-          catch (err) { showError(err); }
-        } },
-      }, ex.is_active ? "⏸" : "▶"),
-      el("button", {
-        class: "icon-btn danger", title: "Eliminar",
-        on: { click: async () => {
-          if (!confirmAction(`¿Eliminar "${ex.name}"? Se quitará también de las rutinas. El historial de series se conserva.`)) return;
-          try { await Exercises.remove(ex.id); toast("Eliminado"); renderExercises(root); }
-          catch (err) { showError(err); }
-        } },
-      }, "🗑"),
-    ]),
+    kebab,
   ]);
-  return row;
 }
 
 function editExercise(ex, root) {

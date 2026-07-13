@@ -194,6 +194,7 @@ body {
 .field > span { padding-left: 2px; }
 input, select, textarea {
   min-height: var(--tap);
+  min-width: 0; /* imprescindible en grids/flex: evita que los inputs desborden en pantallas estrechas */
   padding: 10px 12px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--border);
@@ -251,9 +252,11 @@ input[type="checkbox"] { width: 24px; height: 24px; min-height: 0; accent-color:
 
 /* ---- Sets logging --------------------------------------------------------- */
 .exercise-block--saved { border-color: var(--ok); }
-.exercise-block__head { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+.exercise-block__head { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
 .exercise-block__head .card__title { margin: 0; }
-.exercise-block__controls { display: flex; gap: 10px; margin-top: 12px; }
+.exercise-block__headmain { flex: 1 1 auto; min-width: 0; }
+.exercise-block__chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
+.exercise-block__controls { display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
 .sets__head, .set-row {
   display: grid;
   grid-template-columns: 32px 1fr 1fr 44px 64px 40px;
@@ -411,4 +414,147 @@ input[type="checkbox"] { width: 24px; height: 24px; min-height: 0; accent-color:
 
 @media (min-width: 720px) {
   .grid--macros { gap: 14px; }
+}
+
+/* ==========================================================================
+   Componentes UX: pictogramas, drag&drop, menús ⋯, responsive móvil
+   ========================================================================== */
+
+/* ---- Pictograma de ejercicio ---------------------------------------------- */
+.ex-ico {
+  flex: 0 0 auto;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--primary);
+}
+.ex-ico svg { width: 32px; height: 32px; display: block; }
+
+/* ---- Tirador de arrastre --------------------------------------------------- */
+.drag-handle {
+  flex: 0 0 auto;
+  min-width: 28px;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  border-radius: 8px;
+  cursor: grab;
+  touch-action: none;       /* el dedo arrastra la fila, no hace scroll */
+  user-select: none;
+  -webkit-user-select: none;
+}
+.drag-handle:active { cursor: grabbing; color: var(--text-dim); }
+.dragging {
+  opacity: 0.92;
+  position: relative;
+  z-index: 5;
+  background: var(--card-2);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.45);
+}
+.day-card.dragging { background: var(--card); }
+
+/* ---- Botón ⋯ ---------------------------------------------------------------- */
+.kebab-btn {
+  flex: 0 0 auto;
+  min-width: 42px;
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: 10px;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+.kebab-btn:active { background: var(--card-2); }
+
+/* ---- Menú de acciones (popover / bottom-sheet) ----------------------------- */
+.menu-backdrop { position: fixed; inset: 0; z-index: 120; }
+.menu-backdrop--dim { background: rgba(0, 0, 0, 0.4); }
+.menu-pop {
+  position: fixed;
+  z-index: 121;
+  min-width: 220px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+  padding: 6px;
+}
+.menu-sheet {
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
+  z-index: 121;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-bottom: none;
+  border-radius: 20px 20px 0 0;
+  padding: 8px 10px calc(var(--safe-bottom) + 14px);
+  box-shadow: 0 -12px 34px rgba(0, 0, 0, 0.45);
+  animation: sheetup 0.18s ease;
+}
+@keyframes sheetup { from { transform: translateY(35%); opacity: 0.5; } }
+.menu-title {
+  padding: 10px 14px 6px;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.menu-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 48px;
+  padding: 12px 14px;
+  background: none;
+  border: none;
+  border-radius: 10px;
+  color: var(--text);
+  font-size: 1rem;
+  text-align: left;
+  cursor: pointer;
+}
+.menu-item:active { background: var(--card-2); }
+.menu-item--danger { color: var(--danger); }
+.menu-item__icon { width: 22px; text-align: center; flex: 0 0 auto; }
+.menu-item__chev { margin-left: auto; color: var(--muted); font-size: 1.2rem; }
+
+/* ---- Ajustes de list-row para las nuevas filas ------------------------------ */
+.list-row { align-items: center; }
+.list-row__main { min-width: 0; }
+.days-host .card:last-child { margin-bottom: 0; }
+.day-head { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
+.day-head__title { flex: 1 1 auto; min-width: 0; margin: 0; }
+
+/* ---- Responsive móvil (iPhone y similares) ---------------------------------- */
+@media (max-width: 480px) {
+  .inline-form--wrap select { flex: 1 1 100%; }
+}
+@media (max-width: 430px) {
+  .outlet { padding: 12px 10px 24px; }
+  .card { padding: 14px 12px; }
+  .view-title { font-size: 1.25rem; }
+  .sets__head, .set-row {
+    grid-template-columns: 20px minmax(0, 1fr) minmax(0, 1fr) 30px 52px 32px;
+    gap: 6px;
+  }
+  .set-in { padding: 10px 4px; font-size: 0.95rem; }
+  .ex-ico { width: 40px; height: 40px; }
+  .ex-ico svg { width: 29px; height: 29px; }
+  .grid--actions { grid-template-columns: 1fr; }
 }
