@@ -136,6 +136,7 @@ function plannedRow(pe, planned, idx, allDays, root) {
       el("div", { class: "list-row__title" }, ex.name || "(ejercicio borrado)"),
       el("div", { class: "list-row__sub" }, [
         target || "sin objetivo",
+        pe.target_rest_sec ? ` · ⏱ ${pe.target_rest_sec}s` : "",
         ex.muscle_group ? " · " + ex.muscle_group : "",
       ].join("")),
     ]),
@@ -159,9 +160,12 @@ function editTarget(pe, root) {
   if (sets == null) return;
   const reps = prompt("Reps objetivo (ej. 8-12, 5x5, AMRAP)", pe.target_reps ?? "");
   if (reps == null) return;
+  const rest = prompt("Descanso entre series (segundos)", pe.target_rest_sec ?? "");
+  if (rest == null) return;
   RoutineExercises.update(pe.id, {
     target_sets: sets.trim() === "" ? null : Number(sets),
     target_reps: reps.trim() || null,
+    target_rest_sec: rest.trim() === "" ? null : Number(rest),
   }).then(() => renderRoutine(root)).catch(showError);
 }
 

@@ -15,6 +15,90 @@ import {
 } from "../utils.js";
 import { navigate } from "../router.js";
 
+// ============================================================================
+// Temporizador de descanso · barra flotante con cuenta atrás, +/- 15s,
+// vibración y pitido al llegar a cero. Único a la vez.
+// ============================================================================
+const RestTimer = (() => {
+  let bar, label, time, interval, remaining = 0;
+
+  function build() {
+    time = el("span", { class: "rest__time" }, "0:00");
+    label = el("span", { class: "rest__label" }, "");
+    bar = el("div", { class: "rest-timer", role: "timer" }, [
+      el("button", { class: "rest__btn", title: "-15s", on: { click: () => adjust(-15) } }, "−15"),
+      el("div", { class: "rest__mid" }, [time, label]),
+      el("button", { class: "rest__btn", title: "+15s", on: { click: () => adjust(15) } }, "+15"),
+      el("button", { class: "rest__btn rest__btn--close", title: "Saltar", on: { click: stop } }, "✕"),
+    ]);
+    document.body.append(bar);
+  }
+
+  function fmt(s) {
+    const m = Math.floor(s / 60);
+    const ss = String(Math.max(0, s % 60)).padStart(2, "0");
+    return `${m}:${ss}`;
+  }
+
+  function tick() {
+    remaining -= 1;
+    time.textContent = fmt(remaining);
+    if (remaining <= 0) done();
+  }
+
+  function done() {
+    clearInterval(interval);
+    interval = null;
+    time.textContent = "¡Ya!";
+    bar.classList.add("rest-timer--done");
+    try { navigator.vibrate?.([200, 100, 200]); } catch {}
+    beep();
+    setTimeout(stop, 2500);
+  }
+
+  function beep() {
+    try {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx) return;
+      const ctx = new Ctx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.value = 880;
+      gain.gain.value = 0.12;
+      osc.connect(gain).connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.25);
+      osc.onended = () => ctx.close();
+    } catch {}
+  }
+
+  function adjust(delta) {
+    remaining = Math.max(1, remaining + delta);
+    time.textContent = fmt(remaining);
+    if (!interval) { bar.classList.remove("rest-timer--done"); interval = setInterval(tick, 1000); }
+  }
+
+  function start(seconds, name = "") {
+    if (!bar) build();
+    clearInterval(interval);
+    remaining = seconds;
+    label.textContent = name ? "descanso · " + name : "descanso";
+    time.textContent = fmt(remaining);
+    bar.classList.remove("rest-timer--done");
+    bar.classList.add("rest-timer--show");
+    interval = setInterval(tick, 1000);
+  }
+
+  function stop() {
+    clearInterval(interval);
+    interval = null;
+    bar?.classList.remove("rest-timer--show", "rest-timer--done");
+  }
+
+  return { start, stop };
+})();
+
 export async function renderWorkout(root) {
   loading(root);
   const days = await RoutineDays.list();
@@ -72,14 +156,15 @@ async function startSession(host, date, dayId, days) {
       WorkoutSets.bySession(session.id),
     ]);
 
-    // Prefill: por cada ejercicio del plan, junta lo ya guardado en esta sesión
-    // o, si no hay, lo de la última vez que se hizo.
+    // Por cada ejercicio del plan: historial agrupado (para mostrar marcas) +
+    // prefill (lo ya guardado en esta sesión, o la última vez que se hizo).
     const blocks = await Promise.all(
       planned.map(async (pe) => {
+        const history = await WorkoutSets.historyGrouped(pe.exercise_id, session.id, 5);
         const already = existingSets.filter((s) => s.exercise_id === pe.exercise_id);
-        if (already.length) return { pe, prefill: already, fromLast: false };
-        const last = await WorkoutSets.lastSetsFor(pe.exercise_id, session.id);
-        return { pe, prefill: last, fromLast: true };
+        if (already.length) return { pe, prefill: already, fromLast: false, history };
+        const prefill = history.length ? history[0].sets : [];
+        return { pe, prefill, fromLast: true, history };
       })
     );
 
@@ -122,18 +207,62 @@ function renderSession(host, session, day, blocks) {
   host.append(footer);
 }
 
-function exerciseBlock(session, { pe, prefill, fromLast }) {
+// Formatea las series de una sesión: "40×10 · 40×9 · 37.5×8" (f = al fallo).
+function fmtSetLine(sets) {
+  return sets
+    .map((s) => {
+      const w = s.weight_kg != null ? s.weight_kg : "–";
+      const r = s.reps != null ? s.reps : "–";
+      return `${w}×${r}${s.is_failure ? "f" : ""}`;
+    })
+    .join("  ·  ");
+}
+
+// El mejor set de una sesión (mayor peso; a igualdad, más reps).
+function bestSet(sets) {
+  return sets.reduce((best, s) => {
+    if (s.weight_kg == null) return best;
+    if (!best) return s;
+    if (Number(s.weight_kg) > Number(best.weight_kg)) return s;
+    if (Number(s.weight_kg) === Number(best.weight_kg) && (s.reps || 0) > (best.reps || 0)) return s;
+    return best;
+  }, null);
+}
+
+function historyBox(history) {
+  const box = el("details", { class: "hist", open: history.length <= 2 });
+  const best = history.map((h) => bestSet(h.sets)).filter(Boolean)
+    .reduce((b, s) => (!b || Number(s.weight_kg) > Number(b.weight_kg) ? s : b), null);
+  box.append(el("summary", { class: "hist__summary" },
+    best
+      ? `Marcas anteriores · mejor ${best.weight_kg}×${best.reps}`
+      : "Marcas anteriores"));
+  history.forEach((h) => {
+    box.append(el("div", { class: "hist__row" }, [
+      el("span", { class: "hist__date" }, fmtDate(h.date)),
+      el("span", { class: "hist__sets" }, fmtSetLine(h.sets)),
+    ]));
+  });
+  return box;
+}
+
+function exerciseBlock(session, { pe, prefill, fromLast, history = [] }) {
   const ex = pe.exercise || {};
   const card = el("div", { class: "card exercise-block" });
 
+  const restSec = pe.target_rest_sec || 90;
   const target = [pe.target_sets ? `${pe.target_sets} series` : null, pe.target_reps].filter(Boolean).join(" × ");
   card.append(el("div", { class: "exercise-block__head" }, [
     el("h2", { class: "card__title" }, ex.name || "(ejercicio)"),
     target ? el("span", { class: "chip" }, target) : null,
+    el("span", { class: "chip chip--rest" }, `⏱ ${restSec}s`),
   ]));
   if (prefill.length && fromLast) {
-    card.append(el("div", { class: "muted small" }, "Pre-rellenado con la última vez ✎ ajusta lo que cambie"));
+    card.append(el("div", { class: "muted small" }, "Pre-rellenado con la última vez ✎ supera tus marcas"));
   }
+
+  // Histórico de marcas del ejercicio
+  if (history.length) card.append(historyBox(history));
 
   const rowsHost = el("div", { class: "sets" });
   card.append(el("div", { class: "sets__head" }, [
@@ -172,6 +301,8 @@ function exerciseBlock(session, { pe, prefill, fromLast }) {
 
   const controls = el("div", { class: "exercise-block__controls" }, [
     el("button", { class: "btn btn--small", type: "button", on: { click: () => addRow({}) } }, "＋ Serie"),
+    el("button", { class: "btn btn--small btn--rest", type: "button",
+      on: { click: () => RestTimer.start(restSec, ex.name) } }, `⏱ Descanso ${restSec}s`),
     el("button", {
       class: "btn btn--primary btn--small", type: "button",
       on: { click: async (e) => {

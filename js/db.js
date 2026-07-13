@@ -206,4 +206,29 @@ export const WorkoutSets = {
       .filter((r) => r.session?.id === lastSessionId)
       .sort((a, b) => a.set_number - b.set_number);
   },
+  // Historial agrupado por sesión (más reciente primero), excluyendo la sesión
+  // actual. Devuelve [{ sessionId, date, sets:[...] }].
+  async historyGrouped(exerciseId, excludeSessionId = null, maxSessions = 5) {
+    const rows = await run(
+      sb.from("workout_sets")
+        .select("*, session:workout_sessions(id, session_date)")
+        .eq("exercise_id", exerciseId)
+        .order("created_at", { ascending: false })
+        .limit(120)
+    );
+    const bySession = new Map();
+    for (const r of rows) {
+      const sid = r.session?.id;
+      if (!sid || sid === excludeSessionId) continue;
+      if (!bySession.has(sid)) {
+        bySession.set(sid, { sessionId: sid, date: r.session.session_date, sets: [] });
+      }
+      bySession.get(sid).sets.push(r);
+    }
+    const groups = Array.from(bySession.values())
+      .sort((a, b) => (a.date < b.date ? 1 : -1))
+      .slice(0, maxSessions);
+    groups.forEach((g) => g.sets.sort((a, b) => a.set_number - b.set_number));
+    return groups;
+  },
 };

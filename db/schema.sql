@@ -84,6 +84,7 @@ create table if not exists routine_exercises (
   exercise_order int,
   target_sets int,
   target_reps text,     -- ej. '8-12', 'AMRAP', '5x5'
+  target_rest_sec int,  -- descanso recomendado entre series (segundos)
   notes text
 );
 create index if not exists idx_routine_exercises_day on routine_exercises (routine_day_id, exercise_order);

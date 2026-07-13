@@ -267,6 +267,62 @@ input[type="checkbox"] { width: 24px; height: 24px; min-height: 0; accent-color:
 .set-check { display: flex; justify-content: center; }
 .set-in--rpe { font-size: 0.9rem; }
 
+.chip--rest { border-color: var(--primary); color: var(--primary); }
+.btn--rest { border-color: var(--primary); color: var(--primary); }
+
+/* ---- Histórico de marcas por ejercicio ------------------------------------ */
+.hist {
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 6px 10px;
+  margin: 4px 0 10px;
+  font-size: 0.85rem;
+}
+.hist__summary { cursor: pointer; color: var(--text-dim); font-weight: 600; list-style: none; }
+.hist__summary::-webkit-details-marker { display: none; }
+.hist__summary::before { content: "▸ "; }
+.hist[open] .hist__summary::before { content: "▾ "; }
+.hist__row { display: flex; gap: 10px; padding: 4px 0; border-top: 1px solid var(--border); }
+.hist__date { color: var(--muted); min-width: 4.5rem; }
+.hist__sets { color: var(--text); }
+
+/* ---- Temporizador de descanso (barra flotante) ---------------------------- */
+.rest-timer {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--tabbar-h) + var(--safe-bottom) + 14px);
+  transform: translateX(-50%) translateY(30px);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--card);
+  border: 1px solid var(--primary);
+  border-radius: 999px;
+  padding: 8px 10px;
+  box-shadow: var(--shadow);
+  z-index: 90;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s, transform 0.2s;
+}
+.rest-timer--show { opacity: 1; transform: translateX(-50%) translateY(0); pointer-events: auto; }
+.rest-timer--done { border-color: var(--ok); animation: restpulse 0.5s ease infinite alternate; }
+@keyframes restpulse { to { box-shadow: 0 0 0 4px color-mix(in srgb, var(--ok) 35%, transparent); } }
+.rest__mid { display: flex; flex-direction: column; align-items: center; min-width: 92px; }
+.rest__time { font-size: 1.35rem; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
+.rest__label { font-size: 0.66rem; color: var(--text-dim); max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rest__btn {
+  min-width: 42px; min-height: 42px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--card-2);
+  color: var(--text);
+  font-size: 0.8rem; font-weight: 700;
+  cursor: pointer;
+}
+.rest__btn--close { color: var(--text-dim); }
+
 .session-banner {
   display: flex; justify-content: space-between; align-items: center;
   gap: 10px;
