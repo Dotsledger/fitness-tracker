@@ -53,6 +53,9 @@ export const BodyMetrics = {
   insert(row) {
     return run(sb.from("body_metrics").insert(row).select().single());
   },
+  insertMany(rows) {
+    return run(sb.from("body_metrics").insert(rows).select());
+  },
   update(id, patch) {
     return run(sb.from("body_metrics").update(patch).eq("id", id).select().single());
   },

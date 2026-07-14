@@ -7,6 +7,7 @@ import {
   el, clear, loading, fmt, fmtDate, today, daysAgo, toast, showError, confirmAction, emptyState,
 } from "../utils.js";
 import { lineChart, CHART_COLORS } from "../charts.js";
+import { parseTanitaCsv } from "../tanita-csv.js";
 
 export async function renderBody(root) {
   loading(root);
@@ -17,9 +18,53 @@ export async function renderBody(root) {
   root.append(el("h1", { class: "view-title" }, "Cuerpo"));
 
   if (latest) root.append(summaryCard(latest));
+  root.append(importCard(root, metrics));
   root.append(newMetricCard(root));
   root.append(chartsCard(metrics));
   root.append(metricsTableCard(metrics, root));
+}
+
+// ---------------------------------------------------------------------------
+// Importar el CSV que exporta MyTanita EU. Solo añade fechas que no existan.
+function importCard(root, metrics) {
+  const existing = new Set(metrics.map((m) => m.measured_at));
+  const card = el("details", { class: "card import-card" });
+  card.append(el("summary", { class: "import-card__summary" }, "📥  Importar de MyTanita (CSV)"));
+  card.append(el("p", { class: "muted small" },
+    "En MyTanita: My measurements → Import/Export → exporta a CSV (o te lo envían por email). Elige aquí el archivo y se añaden solo las mediciones nuevas."));
+
+  const fileInput = el("input", { type: "file", accept: ".csv,text/csv" });
+  const status = el("div", { class: "import-status" });
+  card.append(el("label", { class: "field field--wide" }, [el("span", {}, "Archivo CSV"), fileInput]));
+  card.append(status);
+
+  fileInput.addEventListener("change", async () => {
+    const file = fileInput.files?.[0];
+    if (!file) return;
+    status.textContent = "Leyendo…";
+    try {
+      const text = await file.text();
+      const { rows } = parseTanitaCsv(text);
+      if (!rows.length) { status.textContent = "No encontré mediciones en el archivo."; return; }
+      const nuevas = rows.filter((r) => !existing.has(r.measured_at));
+      const dup = rows.length - nuevas.length;
+      if (!nuevas.length) {
+        status.textContent = `El CSV tiene ${rows.length} días, todos ya estaban. Nada que importar.`;
+        return;
+      }
+      status.textContent = `Importando ${nuevas.length} mediciones nuevas…`;
+      await BodyMetrics.insertMany(nuevas);
+      toast(`${nuevas.length} mediciones importadas${dup ? ` (${dup} ya existían)` : ""}`);
+      renderBody(root);
+    } catch (err) {
+      status.textContent = "";
+      showError(err);
+    } finally {
+      fileInput.value = "";
+    }
+  });
+
+  return card;
 }
 
 // ---------------------------------------------------------------------------

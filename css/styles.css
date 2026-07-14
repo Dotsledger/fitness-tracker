@@ -575,6 +575,19 @@ input[type="checkbox"] { width: 24px; height: 24px; min-height: 0; accent-color:
 .menu-day__menu { font-size: 0.92rem; margin-top: 2px; line-height: 1.45; }
 .menu-day__notes { font-size: 0.8rem; color: var(--muted); margin-top: 3px; font-style: italic; }
 
+/* ---- Importar CSV ------------------------------------------------------------ */
+.import-card__summary {
+  cursor: pointer;
+  list-style: none;
+  font-weight: 700;
+  font-size: 1.05rem;
+}
+.import-card__summary::-webkit-details-marker { display: none; }
+.import-card__summary::before { content: "▸ "; color: var(--primary); }
+.import-card[open] .import-card__summary::before { content: "▾ "; }
+.import-card[open] .import-card__summary { margin-bottom: 10px; }
+.import-status { font-size: 0.88rem; color: var(--text-dim); margin-top: 6px; min-height: 1.2em; }
+
 /* ---- Lista de la compra ------------------------------------------------------ */
 .shop-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .shop-head .card__title { margin: 0; }
