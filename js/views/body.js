@@ -2,16 +2,17 @@
 // Vista: Cuerpo (mediciones de la Tanita, histórico y gráficas)
 // ============================================================================
 
-import { BodyMetrics } from "../db.js";
+import { BodyMetrics, Profile } from "../db.js";
+import { LABELS } from "../config.js";
 import {
-  el, clear, loading, fmt, fmtDate, daysAgo, toast, showError, confirmAction, emptyState,
+  el, clear, loading, fmt, fmtDate, daysAgo, ageFrom, toast, showError, confirmAction, emptyState,
 } from "../utils.js";
 import { lineChart, CHART_COLORS } from "../charts.js";
 import { parseTanitaCsv } from "../tanita-csv.js";
 
 export async function renderBody(root) {
   loading(root);
-  const metrics = await BodyMetrics.list(500);
+  const [metrics, profile] = await Promise.all([BodyMetrics.list(500), Profile.get()]);
   const latest = metrics.length ? metrics[metrics.length - 1] : null;
 
   clear(root);
@@ -21,6 +22,68 @@ export async function renderBody(root) {
   root.append(importCard(root, metrics));
   root.append(chartsCard(metrics));
   root.append(metricsTableCard(metrics, root));
+  root.append(personalCard(profile, root));
+}
+
+// ---------------------------------------------------------------------------
+// Datos personales (sexo, nacimiento, altura, actividad). Los diales de
+// nutrición (objetivo, kcal, proteína...) están en la vista Nutrición.
+function personalCard(profile, root) {
+  const card = el("div", { class: "card" });
+  card.append(el("h2", { class: "card__title" }, "Datos personales"));
+
+  if (!profile) {
+    card.append(el("p", { class: "warn" }, "No hay fila de perfil. Ejecuta db/schema.sql (crea una por defecto)."));
+    return card;
+  }
+
+  const form = el("form", { class: "form-grid" });
+  const inputs = {};
+
+  const sexSel = el("select", { name: "sex" });
+  for (const [val, txt] of Object.entries(LABELS.sex)) {
+    sexSel.append(el("option", { value: val, selected: profile.sex === val }, txt));
+  }
+  inputs.sex = sexSel;
+  form.append(el("label", { class: "field" }, [el("span", {}, "Sexo"), sexSel]));
+
+  const birth = el("input", { type: "date", name: "birth_date", value: profile.birth_date || "" });
+  inputs.birth_date = birth;
+  form.append(el("label", { class: "field" }, [
+    el("span", {}, `Fecha nacimiento${profile.birth_date ? ` (${ageFrom(profile.birth_date)} años)` : ""}`), birth,
+  ]));
+
+  const height = el("input", { type: "number", name: "height_cm", step: "any", value: profile.height_cm ?? "", inputmode: "decimal" });
+  inputs.height_cm = height;
+  form.append(el("label", { class: "field" }, [el("span", {}, "Altura (cm)"), height]));
+
+  const actSel = el("select", { name: "activity_level" });
+  for (const [val, txt] of Object.entries(LABELS.activity_level)) {
+    actSel.append(el("option", { value: val, selected: profile.activity_level === val }, txt));
+  }
+  inputs.activity_level = actSel;
+  form.append(el("label", { class: "field" }, [el("span", {}, "Nivel actividad"), actSel]));
+
+  form.append(el("button", { type: "submit", class: "btn btn--primary field--wide" }, "Guardar datos"));
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const patch = {};
+    for (const [name, input] of Object.entries(inputs)) {
+      const v = input.value.trim();
+      patch[name] = v === "" ? null : (input.type === "number" ? Number(v) : v);
+    }
+    try {
+      await Profile.update(profile.id, patch);
+      toast("Datos guardados");
+      renderBody(root);
+    } catch (err) {
+      showError(err);
+    }
+  });
+
+  card.append(form);
+  return card;
 }
 
 // ---------------------------------------------------------------------------

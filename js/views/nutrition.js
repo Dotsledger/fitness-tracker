@@ -7,7 +7,7 @@ import { Profile, BodyMetrics, DietGuidelines, MealPlan, ShoppingList } from "..
 import { computeMacros } from "../macros.js";
 import { LABELS } from "../config.js";
 import {
-  el, clear, loading, fmt, fmtDate, ageFrom, toast, showError,
+  el, clear, loading, fmt, fmtDate, toast, showError, confirmAction,
 } from "../utils.js";
 import { CHART_COLORS } from "../charts.js";
 
@@ -346,14 +346,19 @@ async function addIngredientsToShopping(ingredients, n) {
 }
 
 // ---------------------------------------------------------------------------
+// Solo los "diales" que controlan el cálculo de macros. Los datos personales
+// (sexo, nacimiento, altura, actividad) viven en la vista Cuerpo.
 function profileCard(profile, root) {
   const card = el("div", { class: "card" });
-  card.append(el("h2", { class: "card__title" }, "Perfil y diales de nutrición"));
+  card.append(el("h2", { class: "card__title" }, "Diales de nutrición"));
 
   if (!profile) {
     card.append(el("p", { class: "warn" }, "No hay fila de perfil. Ejecuta db/schema.sql (crea una por defecto)."));
     return card;
   }
+
+  card.append(el("p", { class: "muted small" },
+    "Controlan el cálculo de macros. Se ajustan según tu progreso — normalmente los toco yo (Claude)."));
 
   const form = el("form", { class: "form-grid" });
   const inputs = {};
@@ -372,14 +377,6 @@ function profileCard(profile, root) {
     return el("label", { class: "field" }, [el("span", {}, label), input]);
   };
 
-  form.append(select("sex", "Sexo", LABELS.sex, profile.sex));
-  const birth = el("input", { type: "date", name: "birth_date", value: profile.birth_date || "" });
-  inputs.birth_date = birth;
-  form.append(el("label", { class: "field" }, [
-    el("span", {}, `Fecha nacimiento${profile.birth_date ? ` (${ageFrom(profile.birth_date)} años)` : ""}`), birth,
-  ]));
-  form.append(num("height_cm", "Altura (cm)", profile.height_cm));
-  form.append(select("activity_level", "Nivel actividad", LABELS.activity_level, profile.activity_level));
   form.append(select("goal", "Objetivo", LABELS.goal, profile.goal));
   form.append(num("calorie_adjustment_kcal", "Ajuste kcal (déficit/superávit)", profile.calorie_adjustment_kcal));
   form.append(num("manual_calorie_override", "Override kcal manual (vacío = auto)", profile.manual_calorie_override));
@@ -390,7 +387,7 @@ function profileCard(profile, root) {
   inputs.notes = notes;
   form.append(el("label", { class: "field field--wide" }, [el("span", {}, "Notas"), notes]));
 
-  form.append(el("button", { type: "submit", class: "btn btn--primary field--wide" }, "Guardar perfil"));
+  form.append(el("button", { type: "submit", class: "btn btn--primary field--wide" }, "Guardar diales"));
 
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -405,7 +402,7 @@ function profileCard(profile, root) {
     }
     try {
       await Profile.update(profile.id, patch);
-      toast("Perfil actualizado");
+      toast("Diales actualizados");
       renderNutrition(root);
     } catch (err) {
       showError(err);
