@@ -140,7 +140,19 @@ export const MealPlan = {
 
 export const ShoppingList = {
   list() {
-    return run(sb.from("shopping_list").select("*").order("item_order", { ascending: true }));
+    return run(sb.from("shopping_list").select("*").order("item_order", { ascending: true }).order("item", { ascending: true }));
+  },
+  insert(row) {
+    return run(sb.from("shopping_list").insert(row).select().single());
+  },
+  update(id, patch) {
+    return run(sb.from("shopping_list").update(patch).eq("id", id).select().single());
+  },
+  remove(id) {
+    return run(sb.from("shopping_list").delete().eq("id", id));
+  },
+  clear() {
+    return run(sb.from("shopping_list").delete().not("id", "is", null));
   },
 };
 

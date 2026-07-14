@@ -34,10 +34,8 @@ export async function renderNutrition(root) {
     root.append(dietPlanCard(guidelines, meals));
   }
 
-  // ---- Lista de la compra --------------------------------------------------
-  if (shopping.length) {
-    root.append(shoppingCard(shopping));
-  }
+  // ---- Lista de la compra (siempre visible; vacía tiene su propio mensaje) --
+  root.append(shoppingCard(shopping));
 
   // ---- Perfil / diales -----------------------------------------------------
   root.append(profileCard(profile, root));
@@ -119,13 +117,13 @@ function scaleRecipe(text, n) {
   return text.replace(/\{([^}]*)\}/g, (_, tok) => (n === 1 ? tok : scaleToken(tok, n)));
 }
 
-function recipeBox(raw, refs) {
+function recipeBox(raw, ingredients, refs) {
   const det = el("details", { class: "recipe" });
   det.append(el("summary", { class: "recipe__summary" }, "👨‍🍳 Ver receta"));
 
   const scalable = raw.includes("{");
   const btns = [];
-  if (scalable) {
+  if (scalable || ingredients?.length) {
     const chips = el("div", { class: "recipe__servings" }, [
       el("span", { class: "muted small" }, "Cocinar para"),
     ]);
@@ -139,6 +137,28 @@ function recipeBox(raw, refs) {
       chips.append(b);
     }
     chips.append(el("span", { class: "muted small" }, "personas"));
+
+    if (ingredients?.length) {
+      const addBtn = el("button", { class: "add-shop-btn", type: "button" }, "🛒 Añadir a la compra");
+      addBtn.addEventListener("click", async () => {
+        addBtn.disabled = true;
+        const prev = addBtn.textContent;
+        addBtn.textContent = "Añadiendo…";
+        try {
+          const n = getServings();
+          await addIngredientsToShopping(ingredients, n);
+          toast(`Ingredientes añadidos a la compra (${n} ${n === 1 ? "persona" : "personas"})`);
+          refreshShoppingCard();
+          addBtn.textContent = "✓ Añadido";
+          setTimeout(() => { addBtn.textContent = prev; addBtn.disabled = false; }, 1800);
+        } catch (e) {
+          showError(e);
+          addBtn.textContent = prev;
+          addBtn.disabled = false;
+        }
+      });
+      chips.append(addBtn);
+    }
     det.append(chips);
   }
 
@@ -194,7 +214,7 @@ function dietPlanCard(guidelines, meals) {
         el("div", { class: "menu-day__slotname" }, m.slot),
         el("div", { class: "menu-day__menu" }, m.menu),
         m.notes ? el("div", { class: "menu-day__notes" }, m.notes) : null,
-        m.recipe ? recipeBox(m.recipe, recipeRefs) : null,
+        m.recipe ? recipeBox(m.recipe, m.ingredients, recipeRefs) : null,
       ]));
     }
     card.append(box);
@@ -204,9 +224,18 @@ function dietPlanCard(guidelines, meals) {
 }
 
 // ---------------------------------------------------------------------------
-// Lista de la compra. Los tildes se guardan en localStorage (no en la BD):
-// es un estado personal y efímero, con botón para reiniciar la semana.
+// Lista de la compra. Empieza vacía: se llena desde las recetas (botón 🛒),
+// sumando cantidades según el nº de personas elegido. Los tildes van en
+// localStorage; "Vaciar" borra la lista para empezar otra semana.
 const SHOP_KEY = "ft_shopping_checked";
+const CAT_ORDER = {
+  "🐟 Pescado y marisco": 10,
+  "🍗 Carne y huevos": 30,
+  "🥛 Lácteos y proteína": 40,
+  "🌾 Cereales y carbohidratos": 50,
+  "🥦 Fruta y verdura": 60,
+  "🧴 Suplementos y despensa": 80,
+};
 
 function loadChecked() {
   try { return new Set(JSON.parse(localStorage.getItem(SHOP_KEY) || "[]")); }
@@ -216,22 +245,56 @@ function saveChecked(set) {
   localStorage.setItem(SHOP_KEY, JSON.stringify([...set]));
 }
 
+// Unidades con plural natural ("2 bolsas", "1 bolsa").
+function fmtUnit(amount, unit) {
+  if (!unit || unit === "ud" || unit === "g" || unit === "ml") return unit || "";
+  return amount > 1 ? unit + "s" : unit;
+}
+function fmtShopQty(row) {
+  if (row.amount == null) return row.qty || "";
+  const a = Number(row.amount);
+  const n = a >= 10 ? String(Math.round(a)) : fmtQty(a);
+  return `${n} ${fmtUnit(a, row.unit)}`.trim();
+}
+
+let shopCardRef = null; // referencia viva para refrescar tras añadir desde recetas
+
 function shoppingCard(items) {
   const card = el("div", { class: "card" });
+  shopCardRef = card;
+  fillShoppingCard(card, items);
+  return card;
+}
+
+async function refreshShoppingCard() {
+  if (!shopCardRef || !document.body.contains(shopCardRef)) return;
+  try { fillShoppingCard(shopCardRef, await ShoppingList.list()); }
+  catch (e) { console.warn(e); }
+}
+
+function fillShoppingCard(card, items) {
+  clear(card);
   const checked = loadChecked();
 
-  const header = el("div", { class: "shop-head" }, [
+  card.append(el("div", { class: "shop-head" }, [
     el("h2", { class: "card__title" }, "🛒 Lista de la compra"),
-    el("button", { class: "btn btn--small btn--ghost", on: { click: () => {
-      saveChecked(new Set());
-      card.querySelectorAll("input[type=checkbox]").forEach((c) => {
-        c.checked = false;
-        c.closest(".shop-item").classList.remove("shop-item--done");
-      });
-    } } }, "Reiniciar"),
-  ]);
-  card.append(header);
-  card.append(el("p", { class: "muted small" }, "Para una semana del plan. Marca lo que vayas cogiendo."));
+    items.length ? el("button", { class: "btn btn--small btn--ghost", on: { click: async () => {
+      if (!confirmAction("¿Vaciar toda la lista de la compra?")) return;
+      try {
+        await ShoppingList.clear();
+        saveChecked(new Set());
+        refreshShoppingCard();
+      } catch (e) { showError(e); }
+    } } }, "Vaciar") : null,
+  ]));
+
+  if (!items.length) {
+    card.append(el("p", { class: "muted" },
+      "Lista vacía. Ábrela desde las recetas del plan: elige personas y pulsa «🛒 Añadir a la compra»."));
+    return;
+  }
+
+  card.append(el("p", { class: "muted small" }, "Marca lo que vayas cogiendo. Añade más desde las recetas."));
 
   const groups = new Map();
   for (const it of items) {
@@ -247,7 +310,7 @@ function shoppingCard(items) {
       const row = el("label", { class: "shop-item" + (box.checked ? " shop-item--done" : "") }, [
         box,
         el("span", { class: "shop-item__name" }, it.item),
-        it.qty ? el("span", { class: "shop-item__qty" }, it.qty) : null,
+        el("span", { class: "shop-item__qty" }, fmtShopQty(it)),
       ]);
       box.addEventListener("change", () => {
         if (box.checked) checked.add(it.id); else checked.delete(it.id);
@@ -257,7 +320,29 @@ function shoppingCard(items) {
       card.append(row);
     }
   }
-  return card;
+}
+
+// Añade los ingredientes de una receta (por ración × n personas), sumando
+// sobre lo que ya haya en la lista.
+async function addIngredientsToShopping(ingredients, n) {
+  const list = await ShoppingList.list();
+  for (const ing of ingredients) {
+    const add = Number(ing.amount) * n;
+    const ex = list.find(
+      (r) => r.item.toLowerCase() === ing.item.toLowerCase() && (r.unit || "") === (ing.unit || "") && r.amount != null
+    );
+    if (ex) {
+      await ShoppingList.update(ex.id, { amount: Number(ex.amount) + add });
+    } else {
+      await ShoppingList.insert({
+        category: ing.cat,
+        item: ing.item,
+        amount: add,
+        unit: ing.unit || null,
+        item_order: CAT_ORDER[ing.cat] || 90,
+      });
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------

@@ -137,14 +137,19 @@ create table if not exists meal_plan (
   slot text not null,        -- Desayuno / Comida / Merienda / Cena
   menu text not null,
   notes text,
-  recipe text                -- receta paso a paso (desplegable en la app)
+  recipe text,               -- receta paso a paso; cantidades escalables entre {llaves}
+  ingredients jsonb          -- [{item, amount, unit, cat}] por ración (para la compra)
 );
 
+-- Lista de la compra: empieza vacía; se llena desde las recetas de la app
+-- (botón 🛒), sumando amount por (item, unit).
 create table if not exists shopping_list (
   id uuid primary key default gen_random_uuid(),
   category text not null,
   item text not null,
-  qty text,
+  qty text,                  -- legado (texto libre); la app usa amount+unit
+  amount numeric,
+  unit text,
   item_order int
 );
 
