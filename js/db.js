@@ -118,6 +118,23 @@ export const RoutineExercises = {
   },
 };
 
+// ---- Plan de dieta (pautas + menú semanal) ---------------------------------
+export const DietGuidelines = {
+  list() {
+    return run(sb.from("diet_guidelines").select("*").order("item_order", { ascending: true }));
+  },
+};
+
+export const MealPlan = {
+  list() {
+    return run(
+      sb.from("meal_plan").select("*")
+        .order("day_of_week", { ascending: true })
+        .order("slot_order", { ascending: true })
+    );
+  },
+};
+
 // ---- Workout sessions ------------------------------------------------------
 export const WorkoutSessions = {
   list(limit = 200) {

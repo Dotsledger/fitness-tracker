@@ -2,7 +2,7 @@
 // Vista: Nutrición y cuerpo (perfil, mediciones, macros, gráficas)
 // ============================================================================
 
-import { Profile, BodyMetrics } from "../db.js";
+import { Profile, BodyMetrics, DietGuidelines, MealPlan } from "../db.js";
 import { computeMacros } from "../macros.js";
 import { LABELS } from "../config.js";
 import {
@@ -12,7 +12,12 @@ import { lineChart, CHART_COLORS } from "../charts.js";
 
 export async function renderNutrition(root) {
   loading(root);
-  const [profile, metrics] = await Promise.all([Profile.get(), BodyMetrics.list(500)]);
+  const [profile, metrics, guidelines, meals] = await Promise.all([
+    Profile.get(),
+    BodyMetrics.list(500),
+    DietGuidelines.list().catch(() => []),
+    MealPlan.list().catch(() => []),
+  ]);
   const latest = metrics.length ? metrics[metrics.length - 1] : null;
   const macros = computeMacros(profile, latest);
 
@@ -21,6 +26,11 @@ export async function renderNutrition(root) {
 
   // ---- Macros calculados ---------------------------------------------------
   root.append(macrosCard(macros));
+
+  // ---- Plan de dieta semanal -----------------------------------------------
+  if (guidelines.length || meals.length) {
+    root.append(dietPlanCard(guidelines, meals));
+  }
 
   // ---- Nueva medición ------------------------------------------------------
   root.append(newMetricCard(root));
@@ -77,6 +87,45 @@ function macroTile(name, m, color) {
     el("div", { class: "macro-tile__g" }, `${fmt(m.g, 0)} g`),
     el("div", { class: "macro-tile__pct" }, m.pct != null ? `${fmt(m.pct, 0)}% · ${fmt(m.kcal, 0)} kcal` : "—"),
   ]);
+}
+
+// ---------------------------------------------------------------------------
+const DAY_NAMES = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
+
+function dietPlanCard(guidelines, meals) {
+  const card = el("div", { class: "card" });
+  card.append(el("h2", { class: "card__title" }, "🍽 Plan de dieta semanal"));
+
+  // Pautas (agua, creatina, reglas)
+  for (const g of guidelines) {
+    card.append(el("div", { class: "diet-guide" }, [
+      el("div", { class: "diet-guide__title" }, g.title),
+      el("div", { class: "diet-guide__body" }, g.content),
+    ]));
+  }
+
+  // Menú por días (el de hoy, abierto)
+  const byDay = new Map();
+  for (const m of meals) {
+    if (!byDay.has(m.day_of_week)) byDay.set(m.day_of_week, []);
+    byDay.get(m.day_of_week).push(m);
+  }
+  const todayDow = ((new Date().getDay() + 6) % 7) + 1; // 1=lunes
+
+  for (const [dow, items] of [...byDay.entries()].sort((a, b) => a[0] - b[0])) {
+    const box = el("details", { class: "menu-day", open: dow === todayDow });
+    box.append(el("summary", { class: "menu-day__summary" },
+      DAY_NAMES[dow - 1] + (dow === todayDow ? "  ·  HOY" : "")));
+    for (const m of items) {
+      box.append(el("div", { class: "menu-day__slot" }, [
+        el("div", { class: "menu-day__slotname" }, m.slot),
+        el("div", { class: "menu-day__menu" }, m.menu),
+        m.notes ? el("div", { class: "menu-day__notes" }, m.notes) : null,
+      ]));
+    }
+    card.append(box);
+  }
+  return card;
 }
 
 // ---------------------------------------------------------------------------

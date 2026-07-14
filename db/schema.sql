@@ -119,6 +119,26 @@ create table if not exists workout_sets (
 create index if not exists idx_workout_sets_session on workout_sets (session_id);
 create index if not exists idx_workout_sets_exercise on workout_sets (exercise_id);
 
+-- ----------------------------------------------------------------------------
+-- Plan de dieta: pautas generales (agua, creatina, reglas) + menú semanal.
+-- El contenido se gestiona por SQL (Claude) y la app solo lo muestra.
+-- ----------------------------------------------------------------------------
+create table if not exists diet_guidelines (
+  id uuid primary key default gen_random_uuid(),
+  item_order int,
+  title text not null,
+  content text not null
+);
+
+create table if not exists meal_plan (
+  id uuid primary key default gen_random_uuid(),
+  day_of_week int not null check (day_of_week between 1 and 7), -- 1=lunes
+  slot_order int not null,
+  slot text not null,        -- Desayuno / Comida / Merienda / Cena
+  menu text not null,
+  notes text
+);
+
 -- ============================================================================
 -- Row Level Security
 -- ============================================================================
@@ -142,10 +162,12 @@ declare
   t text;
   tables text[] := array[
     'profile','body_metrics','exercises','routine_days',
-    'routine_exercises','workout_sessions','workout_sets'
+    'routine_exercises','workout_sessions','workout_sets',
+    'diet_guidelines','meal_plan'
   ];
 begin
   foreach t in array tables loop
+    execute format('alter table %I enable row level security', t);
     execute format('drop policy if exists "authorized_full_access" on %I', t);
     execute format('drop policy if exists "anon_full_access" on %I', t);
     execute format(

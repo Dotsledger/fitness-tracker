@@ -541,6 +541,40 @@ input[type="checkbox"] { width: 24px; height: 24px; min-height: 0; accent-color:
 .day-head { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
 .day-head__title { flex: 1 1 auto; min-width: 0; margin: 0; }
 
+/* ---- Plan de dieta ----------------------------------------------------------- */
+.diet-guide {
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--primary);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  margin-bottom: 10px;
+}
+.diet-guide__title { font-weight: 700; font-size: 0.92rem; margin-bottom: 3px; }
+.diet-guide__body { font-size: 0.86rem; color: var(--text-dim); line-height: 1.45; }
+
+.menu-day {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  margin-top: 10px;
+  background: var(--card-2);
+  overflow: hidden;
+}
+.menu-day__summary {
+  cursor: pointer;
+  list-style: none;
+  padding: 12px 14px;
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+.menu-day__summary::-webkit-details-marker { display: none; }
+.menu-day__summary::before { content: "▸ "; color: var(--primary); }
+.menu-day[open] .menu-day__summary::before { content: "▾ "; }
+.menu-day__slot { padding: 10px 14px; border-top: 1px solid var(--border); }
+.menu-day__slotname { font-size: 0.78rem; font-weight: 700; color: var(--primary); text-transform: uppercase; letter-spacing: 0.3px; }
+.menu-day__menu { font-size: 0.92rem; margin-top: 2px; line-height: 1.45; }
+.menu-day__notes { font-size: 0.8rem; color: var(--muted); margin-top: 3px; font-style: italic; }
+
 /* ---- Responsive móvil (iPhone y similares) ---------------------------------- */
 @media (max-width: 480px) {
   .inline-form--wrap select { flex: 1 1 100%; }
