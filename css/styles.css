@@ -601,6 +601,26 @@ input[type="checkbox"] { width: 24px; height: 24px; min-height: 0; accent-color:
   padding: 10px 12px;
   margin-top: 8px;
 }
+.recipe__servings {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+.serv-chip {
+  min-width: 40px;
+  min-height: 40px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--card-2);
+  color: var(--text);
+  font-weight: 700;
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+.serv-chip--on { background: var(--primary); color: var(--primary-ink); border-color: transparent; }
+.recipe__hint { font-size: 0.74rem; color: var(--muted); margin-top: 6px; font-style: italic; }
 
 /* ---- Importar CSV ------------------------------------------------------------ */
 .import-card__summary {

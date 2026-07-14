@@ -88,6 +88,80 @@ function macroTile(name, m, color) {
 }
 
 // ---------------------------------------------------------------------------
+// Escalado de recetas por nº de personas. Las cantidades escalables van entre
+// {llaves} en el texto (tiempos y temperaturas quedan fuera y no se tocan).
+const SERV_KEY = "ft_recipe_servings";
+
+function getServings() {
+  const n = Number(localStorage.getItem(SERV_KEY));
+  return [1, 2, 3, 4].includes(n) ? n : 1;
+}
+
+function fmtQty(v) {
+  const r = Math.round(v * 4) / 4; // al cuarto más cercano
+  const whole = Math.floor(r + 1e-6);
+  const frac = r - whole;
+  const F = [[0.25, "¼"], [0.5, "½"], [0.75, "¾"]];
+  const hit = F.find(([k]) => Math.abs(frac - k) < 0.01);
+  if (hit) return (whole || "") + hit[1];
+  return String(Math.round(r * 100) / 100).replace(".", ",");
+}
+
+function scaleToken(tok, n) {
+  return tok.replace(/(\d+(?:[.,]\d+)?)|([½¼¾])/g, (m) => {
+    const v = m === "½" ? 0.5 : m === "¼" ? 0.25 : m === "¾" ? 0.75 : parseFloat(m.replace(",", "."));
+    const scaled = v * n;
+    return scaled >= 10 ? String(Math.round(scaled)) : fmtQty(scaled);
+  });
+}
+
+function scaleRecipe(text, n) {
+  return text.replace(/\{([^}]*)\}/g, (_, tok) => (n === 1 ? tok : scaleToken(tok, n)));
+}
+
+function recipeBox(raw, refs) {
+  const det = el("details", { class: "recipe" });
+  det.append(el("summary", { class: "recipe__summary" }, "👨‍🍳 Ver receta"));
+
+  const scalable = raw.includes("{");
+  const btns = [];
+  if (scalable) {
+    const chips = el("div", { class: "recipe__servings" }, [
+      el("span", { class: "muted small" }, "Cocinar para"),
+    ]);
+    for (const n of [1, 2, 3, 4]) {
+      const b = el("button", { class: "serv-chip", type: "button" }, String(n));
+      b.addEventListener("click", () => {
+        localStorage.setItem(SERV_KEY, String(n));
+        applyServings(refs);
+      });
+      btns.push({ n, b });
+      chips.append(b);
+    }
+    chips.append(el("span", { class: "muted small" }, "personas"));
+    det.append(chips);
+  }
+
+  const body = el("div", { class: "recipe__body" });
+  det.append(body);
+  if (scalable) {
+    det.append(el("div", { class: "recipe__hint" },
+      "Tu ración (la del menú) no cambia: esto escala lo que cocinas. Si el horno o la airfryer van muy llenos, mejor en 2 tandas; los tiempos apenas cambian."));
+  }
+  refs.push({ raw, body, btns });
+  return det;
+}
+
+// Aplica el nº de personas guardado a todas las recetas de la página.
+function applyServings(refs) {
+  const n = getServings();
+  for (const r of refs) {
+    r.body.textContent = scaleRecipe(r.raw, n);
+    r.btns.forEach(({ n: bn, b }) => b.classList.toggle("serv-chip--on", bn === n));
+  }
+}
+
+// ---------------------------------------------------------------------------
 const DAY_NAMES = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
 
 function dietPlanCard(guidelines, meals) {
@@ -109,6 +183,7 @@ function dietPlanCard(guidelines, meals) {
     byDay.get(m.day_of_week).push(m);
   }
   const todayDow = ((new Date().getDay() + 6) % 7) + 1; // 1=lunes
+  const recipeRefs = []; // recetas de la página, para escalarlas todas a la vez
 
   for (const [dow, items] of [...byDay.entries()].sort((a, b) => a[0] - b[0])) {
     const box = el("details", { class: "menu-day", open: dow === todayDow });
@@ -119,14 +194,12 @@ function dietPlanCard(guidelines, meals) {
         el("div", { class: "menu-day__slotname" }, m.slot),
         el("div", { class: "menu-day__menu" }, m.menu),
         m.notes ? el("div", { class: "menu-day__notes" }, m.notes) : null,
-        m.recipe ? el("details", { class: "recipe" }, [
-          el("summary", { class: "recipe__summary" }, "👨‍🍳 Ver receta"),
-          el("div", { class: "recipe__body" }, m.recipe),
-        ]) : null,
+        m.recipe ? recipeBox(m.recipe, recipeRefs) : null,
       ]));
     }
     card.append(box);
   }
+  applyServings(recipeRefs);
   return card;
 }
 
