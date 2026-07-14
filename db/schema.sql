@@ -138,7 +138,8 @@ create table if not exists meal_plan (
   menu text not null,
   notes text,
   recipe text,               -- receta paso a paso; cantidades escalables entre {llaves}
-  ingredients jsonb          -- [{item, amount, unit, cat}] por ración (para la compra)
+  ingredients jsonb,         -- [{item, amount, unit, cat}] por ración (para la compra)
+  kids_menu text             -- adaptación del plato para los niños (desplegable)
 );
 
 -- Lista de la compra: empieza vacía; se llena desde las recetas de la app

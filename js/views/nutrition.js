@@ -215,6 +215,10 @@ function dietPlanCard(guidelines, meals) {
         el("div", { class: "menu-day__menu" }, m.menu),
         m.notes ? el("div", { class: "menu-day__notes" }, m.notes) : null,
         m.recipe ? recipeBox(m.recipe, m.ingredients, recipeRefs) : null,
+        m.kids_menu ? el("details", { class: "kids" }, [
+          el("summary", { class: "kids__summary" }, "👧👦 Si comen los niños"),
+          el("div", { class: "kids__body" }, m.kids_menu),
+        ]) : null,
       ]));
     }
     card.append(box);
