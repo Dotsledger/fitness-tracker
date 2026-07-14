@@ -75,7 +75,7 @@ export async function renderDashboard(root) {
   // ---- Accesos rápidos -----------------------------------------------------
   const quick = el("div", { class: "grid grid--actions" });
   quick.append(el("a", { class: "btn btn--primary", href: "#/workout" }, "＋ Registrar entreno"));
-  quick.append(el("a", { class: "btn", href: "#/body" }, "＋ Añadir medición"));
+  quick.append(el("a", { class: "btn", href: "#/body" }, "📥 Importar medición"));
   root.append(quick);
 }
 

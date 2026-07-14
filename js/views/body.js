@@ -4,7 +4,7 @@
 
 import { BodyMetrics } from "../db.js";
 import {
-  el, clear, loading, fmt, fmtDate, today, daysAgo, toast, showError, confirmAction, emptyState,
+  el, clear, loading, fmt, fmtDate, daysAgo, toast, showError, confirmAction, emptyState,
 } from "../utils.js";
 import { lineChart, CHART_COLORS } from "../charts.js";
 import { parseTanitaCsv } from "../tanita-csv.js";
@@ -19,7 +19,6 @@ export async function renderBody(root) {
 
   if (latest) root.append(summaryCard(latest));
   root.append(importCard(root, metrics));
-  root.append(newMetricCard(root));
   root.append(chartsCard(metrics));
   root.append(metricsTableCard(metrics, root));
 }
@@ -85,58 +84,6 @@ function stat(label, value, sub) {
     el("div", { class: "stat__value" }, value),
     sub ? el("div", { class: "stat__sub" }, sub) : null,
   ]);
-}
-
-// ---------------------------------------------------------------------------
-function newMetricCard(root) {
-  const card = el("div", { class: "card" });
-  card.append(el("h2", { class: "card__title" }, "Añadir medición (Tanita RD-545)"));
-
-  const fields = [
-    ["measured_at", "Fecha", "date", today()],
-    ["weight_kg", "Peso (kg) *", "number", ""],
-    ["body_fat_pct", "% Grasa", "number", ""],
-    ["muscle_mass_kg", "Masa muscular (kg)", "number", ""],
-    ["body_water_pct", "% Agua", "number", ""],
-    ["visceral_fat_rating", "Grasa visceral", "number", ""],
-    ["bone_mass_kg", "Masa ósea (kg)", "number", ""],
-    ["metabolic_age", "Edad metabólica", "number", ""],
-    ["bmr_device", "BMR báscula", "number", ""],
-  ];
-
-  const form = el("form", { class: "form-grid" });
-  const inputs = {};
-  for (const [name, label, type, val] of fields) {
-    const input = el("input", { type, name, step: "any", value: val, inputmode: type === "number" ? "decimal" : null });
-    inputs[name] = input;
-    form.append(el("label", { class: "field" }, [el("span", {}, label), input]));
-  }
-  const notes = el("input", { type: "text", name: "notes", placeholder: "Notas (opcional)" });
-  inputs.notes = notes;
-  form.append(el("label", { class: "field field--wide" }, [el("span", {}, "Notas"), notes]));
-
-  form.append(el("button", { type: "submit", class: "btn btn--primary field--wide" }, "Guardar medición"));
-
-  form.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const row = {};
-    for (const [name, input] of Object.entries(inputs)) {
-      const v = input.value.trim();
-      if (v === "") continue;
-      row[name] = input.type === "number" ? Number(v) : v;
-    }
-    if (row.weight_kg == null) return toast("El peso es obligatorio", "err");
-    try {
-      await BodyMetrics.insert(row);
-      toast("Medición guardada");
-      renderBody(root);
-    } catch (err) {
-      showError(err);
-    }
-  });
-
-  card.append(form);
-  return card;
 }
 
 // ---------------------------------------------------------------------------
