@@ -12,6 +12,7 @@ export async function renderExercises(root) {
   const list = await Exercises.list({ includeInactive: true });
   clear(root);
 
+  root.append(el("a", { class: "back-link", href: "#/routine" }, "← Rutina"));
   root.append(el("h1", { class: "view-title" }, "Catálogo de ejercicios"));
 
   // ---- Alta ---------------------------------------------------------------

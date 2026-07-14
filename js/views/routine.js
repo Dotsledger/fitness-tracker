@@ -53,6 +53,10 @@ export async function renderRoutine(root) {
   const daysHost = el("div", { class: "days-host" });
   days.forEach((day, i) => daysHost.append(dayCard(day, perDay[i], days, catalog, root)));
   root.append(daysHost);
+
+  // Acceso al catálogo de ejercicios (ya no está en la barra inferior)
+  root.append(el("a", { class: "btn btn--ghost field--wide", href: "#/exercises" },
+    "📋  Catálogo de ejercicios"));
   makeSortable(daysHost, {
     handle: ".drag-day",
     onReorder: async (cards) => {

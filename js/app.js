@@ -11,6 +11,7 @@ import { renderRoutine } from "./views/routine.js";
 import { renderWorkout } from "./views/workout.js";
 import { renderHistory } from "./views/history.js";
 import { renderNutrition } from "./views/nutrition.js";
+import { renderBody } from "./views/body.js";
 import { renderExercises } from "./views/exercises.js";
 
 const NAV = [
@@ -19,7 +20,7 @@ const NAV = [
   { path: "/routine", label: "Rutina", icon: "🗓" },
   { path: "/history", label: "Historial", icon: "📈" },
   { path: "/nutrition", label: "Nutrición", icon: "🥗" },
-  { path: "/exercises", label: "Ejercicios", icon: "📋" },
+  { path: "/body", label: "Cuerpo", icon: "⚖️" },
 ];
 
 function buildChrome() {
@@ -57,6 +58,7 @@ function boot() {
   defineRoute("/history", guard(renderHistory));
   defineRoute("/history/:id", guard(renderHistory));
   defineRoute("/nutrition", guard(renderNutrition));
+  defineRoute("/body", guard(renderBody));
   defineRoute("/exercises", guard(renderExercises));
   setNotFound((root) => {
     root.innerHTML = `<div class="empty"><div class="empty__title">Página no encontrada</div><a class="btn" href="#/">Ir al inicio</a></div>`;
