@@ -119,6 +119,10 @@ function dietPlanCard(guidelines, meals) {
         el("div", { class: "menu-day__slotname" }, m.slot),
         el("div", { class: "menu-day__menu" }, m.menu),
         m.notes ? el("div", { class: "menu-day__notes" }, m.notes) : null,
+        m.recipe ? el("details", { class: "recipe" }, [
+          el("summary", { class: "recipe__summary" }, "👨‍🍳 Ver receta"),
+          el("div", { class: "recipe__body" }, m.recipe),
+        ]) : null,
       ]));
     }
     card.append(box);

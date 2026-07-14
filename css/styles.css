@@ -575,6 +575,33 @@ input[type="checkbox"] { width: 24px; height: 24px; min-height: 0; accent-color:
 .menu-day__menu { font-size: 0.92rem; margin-top: 2px; line-height: 1.45; }
 .menu-day__notes { font-size: 0.8rem; color: var(--muted); margin-top: 3px; font-style: italic; }
 
+/* Receta desplegable dentro de cada comida/cena */
+.recipe { margin-top: 8px; }
+.recipe__summary {
+  cursor: pointer;
+  list-style: none;
+  display: inline-block;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--primary);
+  padding: 6px 12px;
+  border: 1px solid var(--primary);
+  border-radius: 999px;
+}
+.recipe__summary::-webkit-details-marker { display: none; }
+.recipe[open] .recipe__summary { background: color-mix(in srgb, var(--primary) 15%, transparent); }
+.recipe__body {
+  white-space: pre-line;
+  font-size: 0.88rem;
+  line-height: 1.55;
+  color: var(--text);
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  margin-top: 8px;
+}
+
 /* ---- Importar CSV ------------------------------------------------------------ */
 .import-card__summary {
   cursor: pointer;

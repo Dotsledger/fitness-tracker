@@ -136,7 +136,8 @@ create table if not exists meal_plan (
   slot_order int not null,
   slot text not null,        -- Desayuno / Comida / Merienda / Cena
   menu text not null,
-  notes text
+  notes text,
+  recipe text                -- receta paso a paso (desplegable en la app)
 );
 
 create table if not exists shopping_list (
