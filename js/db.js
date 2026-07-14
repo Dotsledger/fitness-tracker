@@ -135,6 +135,12 @@ export const MealPlan = {
   },
 };
 
+export const ShoppingList = {
+  list() {
+    return run(sb.from("shopping_list").select("*").order("item_order", { ascending: true }));
+  },
+};
+
 // ---- Workout sessions ------------------------------------------------------
 export const WorkoutSessions = {
   list(limit = 200) {

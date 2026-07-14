@@ -139,6 +139,14 @@ create table if not exists meal_plan (
   notes text
 );
 
+create table if not exists shopping_list (
+  id uuid primary key default gen_random_uuid(),
+  category text not null,
+  item text not null,
+  qty text,
+  item_order int
+);
+
 -- ============================================================================
 -- Row Level Security
 -- ============================================================================
@@ -163,7 +171,7 @@ declare
   tables text[] := array[
     'profile','body_metrics','exercises','routine_days',
     'routine_exercises','workout_sessions','workout_sets',
-    'diet_guidelines','meal_plan'
+    'diet_guidelines','meal_plan','shopping_list'
   ];
 begin
   foreach t in array tables loop

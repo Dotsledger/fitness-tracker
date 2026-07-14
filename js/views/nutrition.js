@@ -2,7 +2,7 @@
 // Vista: Nutrición y cuerpo (perfil, mediciones, macros, gráficas)
 // ============================================================================
 
-import { Profile, BodyMetrics, DietGuidelines, MealPlan } from "../db.js";
+import { Profile, BodyMetrics, DietGuidelines, MealPlan, ShoppingList } from "../db.js";
 import { computeMacros } from "../macros.js";
 import { LABELS } from "../config.js";
 import {
@@ -12,11 +12,12 @@ import { lineChart, CHART_COLORS } from "../charts.js";
 
 export async function renderNutrition(root) {
   loading(root);
-  const [profile, metrics, guidelines, meals] = await Promise.all([
+  const [profile, metrics, guidelines, meals, shopping] = await Promise.all([
     Profile.get(),
     BodyMetrics.list(500),
     DietGuidelines.list().catch(() => []),
     MealPlan.list().catch(() => []),
+    ShoppingList.list().catch(() => []),
   ]);
   const latest = metrics.length ? metrics[metrics.length - 1] : null;
   const macros = computeMacros(profile, latest);
@@ -30,6 +31,11 @@ export async function renderNutrition(root) {
   // ---- Plan de dieta semanal -----------------------------------------------
   if (guidelines.length || meals.length) {
     root.append(dietPlanCard(guidelines, meals));
+  }
+
+  // ---- Lista de la compra --------------------------------------------------
+  if (shopping.length) {
+    root.append(shoppingCard(shopping));
   }
 
   // ---- Nueva medición ------------------------------------------------------
@@ -124,6 +130,63 @@ function dietPlanCard(guidelines, meals) {
       ]));
     }
     card.append(box);
+  }
+  return card;
+}
+
+// ---------------------------------------------------------------------------
+// Lista de la compra. Los tildes se guardan en localStorage (no en la BD):
+// es un estado personal y efímero, con botón para reiniciar la semana.
+const SHOP_KEY = "ft_shopping_checked";
+
+function loadChecked() {
+  try { return new Set(JSON.parse(localStorage.getItem(SHOP_KEY) || "[]")); }
+  catch { return new Set(); }
+}
+function saveChecked(set) {
+  localStorage.setItem(SHOP_KEY, JSON.stringify([...set]));
+}
+
+function shoppingCard(items) {
+  const card = el("div", { class: "card" });
+  const checked = loadChecked();
+
+  const header = el("div", { class: "shop-head" }, [
+    el("h2", { class: "card__title" }, "🛒 Lista de la compra"),
+    el("button", { class: "btn btn--small btn--ghost", on: { click: () => {
+      saveChecked(new Set());
+      card.querySelectorAll("input[type=checkbox]").forEach((c) => {
+        c.checked = false;
+        c.closest(".shop-item").classList.remove("shop-item--done");
+      });
+    } } }, "Reiniciar"),
+  ]);
+  card.append(header);
+  card.append(el("p", { class: "muted small" }, "Para una semana del plan. Marca lo que vayas cogiendo."));
+
+  const groups = new Map();
+  for (const it of items) {
+    if (!groups.has(it.category)) groups.set(it.category, []);
+    groups.get(it.category).push(it);
+  }
+
+  for (const [cat, list] of groups) {
+    card.append(el("h3", { class: "sub" }, cat));
+    for (const it of list) {
+      const box = el("input", { type: "checkbox" });
+      if (checked.has(it.id)) box.checked = true;
+      const row = el("label", { class: "shop-item" + (box.checked ? " shop-item--done" : "") }, [
+        box,
+        el("span", { class: "shop-item__name" }, it.item),
+        it.qty ? el("span", { class: "shop-item__qty" }, it.qty) : null,
+      ]);
+      box.addEventListener("change", () => {
+        if (box.checked) checked.add(it.id); else checked.delete(it.id);
+        saveChecked(checked);
+        row.classList.toggle("shop-item--done", box.checked);
+      });
+      card.append(row);
+    }
   }
   return card;
 }

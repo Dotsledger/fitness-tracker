@@ -575,6 +575,23 @@ input[type="checkbox"] { width: 24px; height: 24px; min-height: 0; accent-color:
 .menu-day__menu { font-size: 0.92rem; margin-top: 2px; line-height: 1.45; }
 .menu-day__notes { font-size: 0.8rem; color: var(--muted); margin-top: 3px; font-style: italic; }
 
+/* ---- Lista de la compra ------------------------------------------------------ */
+.shop-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.shop-head .card__title { margin: 0; }
+.shop-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 4px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+}
+.shop-item:last-child { border-bottom: none; }
+.shop-item__name { flex: 1 1 auto; }
+.shop-item__qty { color: var(--muted); font-size: 0.82rem; text-align: right; flex: 0 0 auto; }
+.shop-item--done .shop-item__name { text-decoration: line-through; color: var(--muted); }
+.shop-item--done { opacity: 0.6; }
+
 /* ---- Responsive móvil (iPhone y similares) ---------------------------------- */
 @media (max-width: 480px) {
   .inline-form--wrap select { flex: 1 1 100%; }
