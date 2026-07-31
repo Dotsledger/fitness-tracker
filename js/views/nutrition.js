@@ -146,7 +146,7 @@ function dietPlanCard(guidelines, meals) {
     const rows = [];
     const tbody = el("tbody");
     for (const ing of m.ingredients || []) {
-      const qty = el("input", { type: "number", class: "ledger-qty", value: "1", step: "0.25", min: "0" });
+      const qty = el("input", { type: "number", class: "ledger-qty", value: String(ing.qty ?? 1), step: "0.25", min: "0" });
       const outP = el("td", { class: "num" }, fmtG(ing.protein));
       const outH = el("td", { class: "num" }, fmtG(ing.carbs));
       const outG = el("td", { class: "num" }, fmtG(ing.fat));
