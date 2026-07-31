@@ -589,6 +589,9 @@ input[type="checkbox"] { width: 24px; height: 24px; min-height: 0; accent-color:
 
 .ledger-table { font-size: 0.86rem; }
 .ledger-table th:first-child, .ledger-table td:first-child { min-width: 8rem; }
+
+.ledger-save { margin-top: 18px; }
+.ledger-save .btn { width: 100%; }
 .ledger-table .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .ledger-ref { font-size: 0.72rem; color: var(--muted); margin-top: 2px; }
 .ledger-table input.ledger-qty {

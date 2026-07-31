@@ -113,7 +113,7 @@ function dietPlanCard(meals) {
     ]),
   ]));
 
-  const sections = []; // { total:{p,h,g,kcal}, active }
+  const sections = []; // { total:{p,h,g,kcal}, active, slotOrder, rows }
 
   function recalcGrand() {
     let p = 0, h = 0, g = 0, kcal = 0;
@@ -129,7 +129,7 @@ function dietPlanCard(meals) {
 
   for (const m of dayMeals) {
     const isOptional = /opcional/i.test(m.notes || "") || /opcional/i.test(m.menu || "");
-    const section = { total: { p: 0, h: 0, g: 0, kcal: 0 }, active: !isOptional };
+    const section = { total: { p: 0, h: 0, g: 0, kcal: 0 }, active: !isOptional, slotOrder: m.slot_order, rows: null };
     sections.push(section);
 
     const rows = [];
@@ -167,6 +167,7 @@ function dietPlanCard(meals) {
       recalcGrand();
     }
     rows.forEach((r) => r.qty.addEventListener("input", recalcSection));
+    section.rows = rows;
 
     const table = el("table", { class: "table ledger-table" }, [
       el("thead", {}, el("tr", {}, ["Ingrediente", "Cant.(×)", "Prot.", "Carb.", "Grasa", "Kcal"].map((h) => el("th", {}, h)))),
@@ -190,6 +191,28 @@ function dietPlanCard(meals) {
 
     recalcSection();
   }
+
+  const saveBtn = el("button", { class: "btn btn--primary" }, "💾 Guardar cantidades");
+  saveBtn.addEventListener("click", async () => {
+    saveBtn.disabled = true;
+    try {
+      await Promise.all(
+        sections.map((s) => {
+          const newIngredients = s.rows.map((r) => {
+            const q = parseFloat(r.qty.value);
+            return { ...r.ing, qty: isNaN(q) || q < 0 ? 1 : q };
+          });
+          return MealPlan.updateIngredientsBySlot(s.slotOrder, newIngredients);
+        })
+      );
+      toast("Cantidades guardadas");
+    } catch (err) {
+      showError(err);
+    } finally {
+      saveBtn.disabled = false;
+    }
+  });
+  card.append(el("div", { class: "ledger-save" }, saveBtn));
 
   return card;
 }

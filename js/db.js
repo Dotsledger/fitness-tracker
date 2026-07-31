@@ -130,6 +130,11 @@ export const MealPlan = {
         .order("slot_order", { ascending: true })
     );
   },
+  // El menú es igual los 7 días, así que las cantidades del cuaderno se
+  // guardan para todas las filas de ese slot (una por día) de una vez.
+  updateIngredientsBySlot(slotOrder, ingredients) {
+    return run(sb.from("meal_plan").update({ ingredients }).eq("slot_order", slotOrder));
+  },
 };
 
 // ---- Workout sessions ------------------------------------------------------
