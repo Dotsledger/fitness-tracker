@@ -3,7 +3,7 @@
 // Las mediciones corporales, histórico y gráficas están en la vista "Cuerpo".
 // ============================================================================
 
-import { Profile, BodyMetrics, DietGuidelines, MealPlan } from "../db.js";
+import { Profile, BodyMetrics, MealPlan } from "../db.js";
 import { computeMacros } from "../macros.js";
 import { LABELS } from "../config.js";
 import { el, clear, loading, fmt, toast, showError, ageFrom } from "../utils.js";
@@ -11,10 +11,9 @@ import { CHART_COLORS } from "../charts.js";
 
 export async function renderNutrition(root) {
   loading(root);
-  const [profile, metrics, guidelines, meals] = await Promise.all([
+  const [profile, metrics, meals] = await Promise.all([
     Profile.get(),
     BodyMetrics.latest().then((m) => (m ? [m] : [])).catch(() => []),
-    DietGuidelines.list().catch(() => []),
     MealPlan.list().catch(() => []),
   ]);
   const latest = metrics.length ? metrics[0] : null;
@@ -27,8 +26,8 @@ export async function renderNutrition(root) {
   root.append(macrosCard(macros));
 
   // ---- Plan de dieta / cuaderno nutricional ---------------------------------
-  if (guidelines.length || meals.length) {
-    root.append(dietPlanCard(guidelines, meals));
+  if (meals.length) {
+    root.append(dietPlanCard(meals));
   }
 
   // ---- Calculadora de macros -------------------------------------------------
@@ -89,19 +88,9 @@ function fmtG(n) {
   return (n ?? 0).toLocaleString("es-ES", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 }
 
-function dietPlanCard(guidelines, meals) {
+function dietPlanCard(meals) {
   const card = el("div", { class: "card" });
   card.append(el("h2", { class: "card__title" }, "🍽 Tu dieta"));
-
-  // Pautas (agua, creatina, reglas)
-  for (const g of guidelines) {
-    card.append(el("div", { class: "diet-guide" }, [
-      el("div", { class: "diet-guide__title" }, g.title),
-      el("div", { class: "diet-guide__body" }, g.content),
-    ]));
-  }
-
-  if (!meals.length) return card;
 
   card.append(el("h3", { class: "sub" }, "Cuaderno nutricional"));
   card.append(el("p", { class: "muted small" },

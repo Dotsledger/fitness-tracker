@@ -121,16 +121,9 @@ create index if not exists idx_workout_sets_session on workout_sets (session_id)
 create index if not exists idx_workout_sets_exercise on workout_sets (exercise_id);
 
 -- ----------------------------------------------------------------------------
--- Plan de dieta: pautas generales (agua, creatina, reglas) + menú semanal.
+-- Plan de dieta: menú semanal (cuaderno nutricional por ingrediente).
 -- El contenido se gestiona por SQL (Claude) y la app solo lo muestra.
 -- ----------------------------------------------------------------------------
-create table if not exists diet_guidelines (
-  id uuid primary key default gen_random_uuid(),
-  item_order int,
-  title text not null,
-  content text not null
-);
-
 create table if not exists meal_plan (
   id uuid primary key default gen_random_uuid(),
   day_of_week int not null check (day_of_week between 1 and 7), -- 1=lunes
@@ -168,7 +161,7 @@ declare
   tables text[] := array[
     'profile','body_metrics','exercises','routine_days',
     'routine_exercises','workout_sessions','workout_sets',
-    'diet_guidelines','meal_plan'
+    'meal_plan'
   ];
 begin
   foreach t in array tables loop

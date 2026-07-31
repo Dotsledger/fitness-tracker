@@ -121,13 +121,7 @@ export const RoutineExercises = {
   },
 };
 
-// ---- Plan de dieta (pautas + menú semanal) ---------------------------------
-export const DietGuidelines = {
-  list() {
-    return run(sb.from("diet_guidelines").select("*").order("item_order", { ascending: true }));
-  },
-};
-
+// ---- Plan de dieta (menú semanal) ------------------------------------------
 export const MealPlan = {
   list() {
     return run(

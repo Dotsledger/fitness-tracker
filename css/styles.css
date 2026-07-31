@@ -541,19 +541,6 @@ input[type="checkbox"] { width: 24px; height: 24px; min-height: 0; accent-color:
 .day-head { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
 .day-head__title { flex: 1 1 auto; min-width: 0; margin: 0; }
 
-/* ---- Plan de dieta ----------------------------------------------------------- */
-.diet-guide {
-  background: var(--bg-2);
-  border: 1px solid var(--border);
-  border-left: 3px solid var(--primary);
-  border-radius: var(--radius-sm);
-  padding: 10px 12px;
-  margin-bottom: 10px;
-}
-.diet-guide__title { font-weight: 700; font-size: 0.92rem; margin-bottom: 3px; }
-.diet-guide__body { font-size: 0.86rem; color: var(--text-dim); line-height: 1.45; }
-
-
 /* ---- Importar CSV ------------------------------------------------------------ */
 .import-card__summary {
   cursor: pointer;
