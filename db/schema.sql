@@ -121,20 +121,39 @@ create index if not exists idx_workout_sets_session on workout_sets (session_id)
 create index if not exists idx_workout_sets_exercise on workout_sets (exercise_id);
 
 -- ----------------------------------------------------------------------------
--- Plan de dieta: menú semanal (cuaderno nutricional por ingrediente).
--- El contenido se gestiona por SQL (Claude) y la app solo lo muestra.
+-- Cuaderno nutricional: biblioteca de alimentos + comidas componibles.
+-- foods = catálogo editable desde la app (/foods). meal_slots = las 4 comidas
+-- del día (menú fijo, igual todos los días). meal_items = qué alimentos lleva
+-- cada comida y en qué cantidad (× ración base del alimento).
 -- ----------------------------------------------------------------------------
-create table if not exists meal_plan (
+create table if not exists foods (
   id uuid primary key default gen_random_uuid(),
-  day_of_week int not null check (day_of_week between 1 and 7), -- 1=lunes
-  slot_order int not null,
-  slot text not null,        -- Desayuno / Comida / Merienda / Cena
-  menu text not null,
-  notes text,
-  recipe text,               -- receta paso a paso; cantidades escalables entre {llaves}
-  ingredients jsonb,         -- [{item, amount, unit, cat}] por ración (para la compra)
-  kids_menu text             -- adaptación del plato para los niños (desplegable)
+  name text not null,
+  cat text,                    -- categoría con emoji (ej. "🥛 Lácteos y proteína")
+  amount numeric not null,     -- ración base (ej. 30)
+  unit text not null,          -- g / ml / ud
+  kcal numeric not null default 0,     -- macros POR ración base
+  protein numeric not null default 0,
+  carbs numeric not null default 0,
+  fat numeric not null default 0,
+  is_active boolean default true
 );
+
+create table if not exists meal_slots (
+  id uuid primary key default gen_random_uuid(),
+  slot_order int not null,
+  name text not null,          -- "Desayuno (post-entreno ~8:30)"
+  optional boolean default false  -- merienda: excluida del total por defecto
+);
+
+create table if not exists meal_items (
+  id uuid primary key default gen_random_uuid(),
+  meal_slot_id uuid references meal_slots(id) on delete cascade,
+  food_id uuid references foods(id) on delete cascade,
+  qty numeric not null default 1,
+  item_order int
+);
+create index if not exists idx_meal_items_slot on meal_items (meal_slot_id, item_order);
 
 
 -- ============================================================================
@@ -161,7 +180,7 @@ declare
   tables text[] := array[
     'profile','body_metrics','exercises','routine_days',
     'routine_exercises','workout_sessions','workout_sets',
-    'meal_plan'
+    'foods','meal_slots','meal_items'
   ];
 begin
   foreach t in array tables loop

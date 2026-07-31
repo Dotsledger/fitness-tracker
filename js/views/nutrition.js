@@ -3,7 +3,7 @@
 // Las mediciones corporales, histórico y gráficas están en la vista "Cuerpo".
 // ============================================================================
 
-import { Profile, BodyMetrics, MealPlan } from "../db.js";
+import { Profile, BodyMetrics, Foods, MealSlots, MealItems } from "../db.js";
 import { computeMacros } from "../macros.js";
 import { LABELS } from "../config.js";
 import { el, clear, loading, fmt, toast, showError, ageFrom } from "../utils.js";
@@ -11,10 +11,12 @@ import { CHART_COLORS } from "../charts.js";
 
 export async function renderNutrition(root) {
   loading(root);
-  const [profile, metrics, meals] = await Promise.all([
+  const [profile, metrics, slots, items, foods] = await Promise.all([
     Profile.get(),
     BodyMetrics.latest().then((m) => (m ? [m] : [])).catch(() => []),
-    MealPlan.list().catch(() => []),
+    MealSlots.list().catch(() => []),
+    MealItems.list().catch(() => []),
+    Foods.list().catch(() => []),
   ]);
   const latest = metrics.length ? metrics[0] : null;
   const macros = computeMacros(profile, latest);
@@ -25,9 +27,9 @@ export async function renderNutrition(root) {
   // ---- Macros calculados ---------------------------------------------------
   root.append(macrosCard(macros));
 
-  // ---- Plan de dieta / cuaderno nutricional ---------------------------------
-  if (meals.length) {
-    root.append(dietPlanCard(meals));
+  // ---- Cuaderno nutricional --------------------------------------------------
+  if (slots.length) {
+    root.append(dietPlanCard(slots, items, foods, root));
   }
 
   // ---- Calculadora de macros -------------------------------------------------
@@ -79,26 +81,22 @@ function macroTile(name, m, color) {
 }
 
 // ---------------------------------------------------------------------------
-// Cuaderno nutricional: el menú es fijo (igual los 7 días), así que se muestra
-// UN solo juego de comidas (día 1) como desglose editable ingrediente a
-// ingrediente — no un acordeón de 7 días iguales. Cada fila tiene un
-// multiplicador (×1 = ración normal) que recalcula esa fila, el subtotal de
-// la comida, y el total del día, en vivo.
+// Cuaderno nutricional: cada comida (meal_slot) contiene alimentos de la
+// biblioteca (meal_items → foods). Cada fila tiene un multiplicador (×1 =
+// ración base del alimento) que recalcula fila/subtotal/total en vivo; el
+// botón Guardar persiste las cantidades. Añadir/quitar alimentos se hace
+// por comida con el select de la biblioteca y el botón ✕ de cada fila.
 function fmtG(n) {
   return (n ?? 0).toLocaleString("es-ES", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 }
 
-function dietPlanCard(meals) {
+function dietPlanCard(slots, items, foods, root) {
   const card = el("div", { class: "card" });
   card.append(el("h2", { class: "card__title" }, "🍽 Tu dieta"));
 
   card.append(el("h3", { class: "sub" }, "Cuaderno nutricional"));
   card.append(el("p", { class: "muted small" },
-    "Ingrediente a ingrediente. Cambia la cantidad (×1 = ración normal) y los totales se recalculan solos."));
-
-  // Un solo día representativo, ya que el menú es igual los 7 días.
-  const firstDow = Math.min(...meals.map((m) => m.day_of_week));
-  const dayMeals = meals.filter((m) => m.day_of_week === firstDow).sort((a, b) => a.slot_order - b.slot_order);
+    "Cambia la cantidad (×1 = ración base), añade o quita alimentos de cada comida, y los totales se recalculan solos."));
 
   const grandKcal = el("span", { class: "ledger-grand__kcal" }, "0");
   const grandP = el("span", {}, "0 g");
@@ -113,7 +111,7 @@ function dietPlanCard(meals) {
     ]),
   ]));
 
-  const sections = []; // { total:{p,h,g,kcal}, active, slotOrder, rows }
+  const sections = []; // { total:{p,h,g,kcal}, active, rows }
 
   function recalcGrand() {
     let p = 0, h = 0, g = 0, kcal = 0;
@@ -127,26 +125,11 @@ function dietPlanCard(meals) {
     grandF.textContent = fmtG(g) + " g";
   }
 
-  for (const m of dayMeals) {
-    const isOptional = /opcional/i.test(m.notes || "") || /opcional/i.test(m.menu || "");
-    const section = { total: { p: 0, h: 0, g: 0, kcal: 0 }, active: !isOptional, slotOrder: m.slot_order, rows: null };
+  for (const slot of slots) {
+    const slotItems = items.filter((it) => it.meal_slot_id === slot.id && it.food);
+    const section = { total: { p: 0, h: 0, g: 0, kcal: 0 }, active: !slot.optional, rows: [] };
     sections.push(section);
-
-    const rows = [];
-    const tbody = el("tbody");
-    for (const ing of m.ingredients || []) {
-      const qty = el("input", { type: "number", class: "ledger-qty", value: String(ing.qty ?? 1), step: "0.25", min: "0" });
-      const outP = el("td", { class: "num" }, fmtG(ing.protein));
-      const outH = el("td", { class: "num" }, fmtG(ing.carbs));
-      const outG = el("td", { class: "num" }, fmtG(ing.fat));
-      const outK = el("td", { class: "num" }, String(Math.round(ing.kcal || 0)));
-      rows.push({ ing, qty, outP, outH, outG, outK });
-      tbody.append(el("tr", {}, [
-        el("td", {}, [ing.item, el("div", { class: "ledger-ref" }, `ración base: ${fmt(ing.amount, ing.amount < 10 ? 2 : 0)} ${ing.unit}`)]),
-        el("td", { class: "num" }, qty),
-        outP, outH, outG, outK,
-      ]));
-    }
+    const rows = section.rows;
 
     const subP = el("td", { class: "num" }, "0.0");
     const subH = el("td", { class: "num" }, "0.0");
@@ -158,7 +141,8 @@ function dietPlanCard(meals) {
       for (const r of rows) {
         const q = parseFloat(r.qty.value);
         const n = isNaN(q) || q < 0 ? 0 : q;
-        const rp = (r.ing.protein || 0) * n, rh = (r.ing.carbs || 0) * n, rg = (r.ing.fat || 0) * n, rk = (r.ing.kcal || 0) * n;
+        const f = r.item.food;
+        const rp = (f.protein || 0) * n, rh = (f.carbs || 0) * n, rg = (f.fat || 0) * n, rk = (f.kcal || 0) * n;
         r.outP.textContent = fmtG(rp); r.outH.textContent = fmtG(rh); r.outG.textContent = fmtG(rg); r.outK.textContent = String(Math.round(rk));
         p += rp; h += rh; g += rg; kcal += rk;
       }
@@ -166,27 +150,82 @@ function dietPlanCard(meals) {
       section.total = { p, h, g, kcal };
       recalcGrand();
     }
-    rows.forEach((r) => r.qty.addEventListener("input", recalcSection));
-    section.rows = rows;
+
+    const tbody = el("tbody");
+    function addRow(item) {
+      const f = item.food;
+      const qty = el("input", { type: "number", class: "ledger-qty", value: String(item.qty ?? 1), step: "0.25", min: "0" });
+      const outP = el("td", { class: "num" }, "0.0");
+      const outH = el("td", { class: "num" }, "0.0");
+      const outG = el("td", { class: "num" }, "0.0");
+      const outK = el("td", { class: "num" }, "0");
+      const delBtn = el("button", { type: "button", class: "ledger-del", title: `Quitar ${f.name}` }, "✕");
+      const tr = el("tr", {}, [
+        el("td", {}, [f.name, el("div", { class: "ledger-ref" }, `ración base: ${fmt(f.amount, f.amount < 10 ? 2 : 0)} ${f.unit}`)]),
+        el("td", { class: "num" }, qty),
+        outP, outH, outG, outK,
+        el("td", { class: "num" }, delBtn),
+      ]);
+      const row = { item, qty, outP, outH, outG, outK };
+      rows.push(row);
+      tbody.append(tr);
+      qty.addEventListener("input", recalcSection);
+      delBtn.addEventListener("click", async () => {
+        try {
+          await MealItems.remove(item.id);
+          rows.splice(rows.indexOf(row), 1);
+          tr.remove();
+          recalcSection();
+        } catch (err) { showError(err); }
+      });
+    }
+    slotItems.forEach(addRow);
 
     const table = el("table", { class: "table ledger-table" }, [
-      el("thead", {}, el("tr", {}, ["Ingrediente", "Cant.(×)", "Prot.", "Carb.", "Grasa", "Kcal"].map((h) => el("th", {}, h)))),
+      el("thead", {}, el("tr", {}, ["Ingrediente", "Cant.(×)", "Prot.", "Carb.", "Grasa", "Kcal", ""].map((h) => el("th", {}, h)))),
       tbody,
       el("tfoot", {}, el("tr", { class: "ledger-subtotal" }, [
-        el("td", {}, "Subtotal"), el("td", {}), subP, subH, subG, subK,
+        el("td", {}, "Subtotal"), el("td", {}), subP, subH, subG, subK, el("td", {}),
       ])),
     ]);
 
+    // Añadir alimento de la biblioteca a esta comida
+    const addForm = el("form", { class: "inline-form inline-form--wrap ledger-add" });
+    const sel = el("select", {});
+    sel.append(el("option", { value: "" }, "— Alimento —"));
+    foods.forEach((f) => sel.append(el("option", { value: f.id }, f.name)));
+    const addQty = el("input", { type: "number", value: "1", step: "0.25", min: "0", style: "width:5.5rem", inputmode: "decimal", title: "Cantidad (×ración base)" });
+    addForm.append(sel, addQty, el("button", { type: "submit", class: "btn" }, "＋ Añadir"));
+    addForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      if (!sel.value) return toast("Elige un alimento", "err");
+      try {
+        const order = slotItems.length || rows.length
+          ? Math.max(0, ...rows.map((r) => r.item.item_order || 0)) + 1 : 1;
+        const inserted = await MealItems.insert({
+          meal_slot_id: slot.id,
+          food_id: sel.value,
+          qty: parseFloat(addQty.value) || 1,
+          item_order: order,
+        });
+        addRow(inserted);
+        recalcSection();
+        sel.value = "";
+        addQty.value = "1";
+      } catch (err) { showError(err); }
+    });
+
     const headRight = [];
-    if (isOptional) {
+    if (slot.optional) {
       const toggle = el("input", { type: "checkbox" });
       toggle.addEventListener("change", () => { section.active = toggle.checked; recalcGrand(); });
       headRight.push(el("label", { class: "ledger-toggle" }, [toggle, "incluir en el total"]));
     }
 
     card.append(el("div", { class: "ledger-section" }, [
-      el("div", { class: "ledger-section__head" }, [el("h4", { class: "ledger-section__title" }, m.slot), ...headRight]),
+      el("div", { class: "ledger-section__head" }, [el("h4", { class: "ledger-section__title" }, slot.name), ...headRight]),
       el("div", { class: "table-wrap" }, table),
+      addForm,
     ]));
 
     recalcSection();
@@ -196,15 +235,13 @@ function dietPlanCard(meals) {
   saveBtn.addEventListener("click", async () => {
     saveBtn.disabled = true;
     try {
-      await Promise.all(
-        sections.map((s) => {
-          const newIngredients = s.rows.map((r) => {
-            const q = parseFloat(r.qty.value);
-            return { ...r.ing, qty: isNaN(q) || q < 0 ? 1 : q };
-          });
-          return MealPlan.updateIngredientsBySlot(s.slotOrder, newIngredients);
+      const pairs = sections.flatMap((s) =>
+        s.rows.map((r) => {
+          const q = parseFloat(r.qty.value);
+          return { id: r.item.id, qty: isNaN(q) || q < 0 ? 1 : q };
         })
       );
+      await MealItems.updateQtys(pairs);
       toast("Cantidades guardadas");
     } catch (err) {
       showError(err);
@@ -212,7 +249,10 @@ function dietPlanCard(meals) {
       saveBtn.disabled = false;
     }
   });
-  card.append(el("div", { class: "ledger-save" }, saveBtn));
+  card.append(el("div", { class: "ledger-save" }, [
+    saveBtn,
+    el("a", { class: "btn btn--ghost", href: "#/foods" }, "🥫 Biblioteca de alimentos"),
+  ]));
 
   return card;
 }

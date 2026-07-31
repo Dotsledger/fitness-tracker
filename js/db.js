@@ -123,19 +123,49 @@ export const RoutineExercises = {
   },
 };
 
-// ---- Plan de dieta (menú semanal) ------------------------------------------
-export const MealPlan = {
+// ---- Biblioteca de alimentos + comidas componibles ---------------------------
+export const Foods = {
+  list({ includeInactive = false } = {}) {
+    let q = sb.from("foods").select("*").order("name", { ascending: true });
+    if (!includeInactive) q = q.eq("is_active", true);
+    return run(q);
+  },
+  insert(row) {
+    return run(sb.from("foods").insert(row).select().single());
+  },
+  update(id, patch) {
+    return run(sb.from("foods").update(patch).eq("id", id).select().single());
+  },
+  remove(id) {
+    return run(sb.from("foods").delete().eq("id", id));
+  },
+};
+
+export const MealSlots = {
+  list() {
+    return run(sb.from("meal_slots").select("*").order("slot_order", { ascending: true }));
+  },
+};
+
+export const MealItems = {
   list() {
     return run(
-      sb.from("meal_plan").select("*")
-        .order("day_of_week", { ascending: true })
-        .order("slot_order", { ascending: true })
+      sb.from("meal_items")
+        .select("*, food:foods(*)")
+        .order("item_order", { ascending: true })
     );
   },
-  // El menú es igual los 7 días, así que las cantidades del cuaderno se
-  // guardan para todas las filas de ese slot (una por día) de una vez.
-  updateIngredientsBySlot(slotOrder, ingredients) {
-    return run(sb.from("meal_plan").update({ ingredients }).eq("slot_order", slotOrder));
+  insert(row) {
+    return run(sb.from("meal_items").insert(row).select("*, food:foods(*)").single());
+  },
+  update(id, patch) {
+    return run(sb.from("meal_items").update(patch).eq("id", id).select().single());
+  },
+  remove(id) {
+    return run(sb.from("meal_items").delete().eq("id", id));
+  },
+  updateQtys(pairs) {
+    return Promise.all(pairs.map(({ id, qty }) => MealItems.update(id, { qty })));
   },
 };
 

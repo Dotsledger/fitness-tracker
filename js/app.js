@@ -12,6 +12,7 @@ import { renderHistory } from "./views/history.js";
 import { renderNutrition } from "./views/nutrition.js";
 import { renderBody } from "./views/body.js";
 import { renderExercises } from "./views/exercises.js";
+import { renderFoods } from "./views/foods.js";
 
 const NAV = [
   { path: "/workout", label: "Entreno", icon: "🏋" },
@@ -58,6 +59,7 @@ function boot() {
   defineRoute("/nutrition", guard(renderNutrition));
   defineRoute("/body", guard(renderBody));
   defineRoute("/exercises", guard(renderExercises));
+  defineRoute("/foods", guard(renderFoods));
   setNotFound((root) => {
     root.innerHTML = `<div class="empty"><div class="empty__title">Página no encontrada</div><a class="btn" href="#/">Ir a Entreno</a></div>`;
   });
