@@ -1,24 +1,21 @@
 // ============================================================================
-// Vista: Nutrición (macros objetivo, plan de dieta, lista de compra, perfil)
+// Vista: Nutrición (macros objetivo, plan de dieta, calculadora)
 // Las mediciones corporales, histórico y gráficas están en la vista "Cuerpo".
 // ============================================================================
 
-import { Profile, BodyMetrics, DietGuidelines, MealPlan, ShoppingList } from "../db.js";
+import { Profile, BodyMetrics, DietGuidelines, MealPlan } from "../db.js";
 import { computeMacros } from "../macros.js";
 import { LABELS } from "../config.js";
-import {
-  el, clear, loading, fmt, fmtDate, toast, showError, confirmAction,
-} from "../utils.js";
+import { el, clear, loading, fmt, toast, showError, ageFrom } from "../utils.js";
 import { CHART_COLORS } from "../charts.js";
 
 export async function renderNutrition(root) {
   loading(root);
-  const [profile, metrics, guidelines, meals, shopping] = await Promise.all([
+  const [profile, metrics, guidelines, meals] = await Promise.all([
     Profile.get(),
     BodyMetrics.latest().then((m) => (m ? [m] : [])).catch(() => []),
     DietGuidelines.list().catch(() => []),
     MealPlan.list().catch(() => []),
-    ShoppingList.list().catch(() => []),
   ]);
   const latest = metrics.length ? metrics[0] : null;
   const macros = computeMacros(profile, latest);
@@ -29,16 +26,13 @@ export async function renderNutrition(root) {
   // ---- Macros calculados ---------------------------------------------------
   root.append(macrosCard(macros));
 
-  // ---- Plan de dieta semanal -----------------------------------------------
+  // ---- Plan de dieta / cuaderno nutricional ---------------------------------
   if (guidelines.length || meals.length) {
     root.append(dietPlanCard(guidelines, meals));
   }
 
-  // ---- Lista de la compra (siempre visible; vacía tiene su propio mensaje) --
-  root.append(shoppingCard(shopping));
-
-  // ---- Perfil / diales -----------------------------------------------------
-  root.append(profileCard(profile, root));
+  // ---- Calculadora de macros -------------------------------------------------
+  root.append(calculatorCard(profile, latest, root));
 }
 
 // ---------------------------------------------------------------------------
@@ -47,7 +41,7 @@ function macrosCard(macros) {
   card.append(el("h2", { class: "card__title" }, "Macros objetivo (hoy)"));
   if (!macros || macros.targetCalories == null) {
     card.append(el("p", { class: "muted" },
-      "Faltan datos para calcular. Necesitas una medición con % de grasa y el perfil completo."));
+      "Faltan datos para calcular. Necesitas una medición de peso y el perfil (altura/edad/sexo) completo."));
     if (macros?.warnings?.length) {
       macros.warnings.forEach((w) => card.append(el("p", { class: "warn" }, "⚠ " + w)));
     }
@@ -62,7 +56,7 @@ function macrosCard(macros) {
   card.append(kcal);
 
   const detail = el("div", { class: "kcal-detail muted" },
-    `BMR ${fmt(macros.bmr, 0)} · TDEE ${fmt(macros.tdee, 0)} · masa magra ${fmt(macros.leanMass)} kg · ×${macros.activityMultiplier}`);
+    `TMB ${fmt(macros.bmr, 0)} · TDEE ${fmt(macros.tdee, 0)} · ${macros.age ?? "—"} años · ×${macros.activityMultiplier}`);
   card.append(detail);
 
   const macroGrid = el("div", { class: "grid grid--macros" });
@@ -86,107 +80,18 @@ function macroTile(name, m, color) {
 }
 
 // ---------------------------------------------------------------------------
-// Escalado de recetas por nº de personas. Las cantidades escalables van entre
-// {llaves} en el texto (tiempos y temperaturas quedan fuera y no se tocan).
-const SERV_KEY = "ft_recipe_servings";
-
-function getServings() {
-  const n = Number(localStorage.getItem(SERV_KEY));
-  return [1, 2, 3, 4].includes(n) ? n : 1;
+// Cuaderno nutricional: el menú es fijo (igual los 7 días), así que se muestra
+// UN solo juego de comidas (día 1) como desglose editable ingrediente a
+// ingrediente — no un acordeón de 7 días iguales. Cada fila tiene un
+// multiplicador (×1 = ración normal) que recalcula esa fila, el subtotal de
+// la comida, y el total del día, en vivo.
+function fmtG(n) {
+  return (n ?? 0).toLocaleString("es-ES", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 }
-
-function fmtQty(v) {
-  const r = Math.round(v * 4) / 4; // al cuarto más cercano
-  const whole = Math.floor(r + 1e-6);
-  const frac = r - whole;
-  const F = [[0.25, "¼"], [0.5, "½"], [0.75, "¾"]];
-  const hit = F.find(([k]) => Math.abs(frac - k) < 0.01);
-  if (hit) return (whole || "") + hit[1];
-  return String(Math.round(r * 100) / 100).replace(".", ",");
-}
-
-function scaleToken(tok, n) {
-  return tok.replace(/(\d+(?:[.,]\d+)?)|([½¼¾])/g, (m) => {
-    const v = m === "½" ? 0.5 : m === "¼" ? 0.25 : m === "¾" ? 0.75 : parseFloat(m.replace(",", "."));
-    const scaled = v * n;
-    return scaled >= 10 ? String(Math.round(scaled)) : fmtQty(scaled);
-  });
-}
-
-function scaleRecipe(text, n) {
-  return text.replace(/\{([^}]*)\}/g, (_, tok) => (n === 1 ? tok : scaleToken(tok, n)));
-}
-
-function recipeBox(raw, ingredients, refs) {
-  const det = el("details", { class: "recipe" });
-  det.append(el("summary", { class: "recipe__summary" }, "👨‍🍳 Ver receta"));
-
-  const scalable = raw.includes("{");
-  const btns = [];
-  if (scalable || ingredients?.length) {
-    const chips = el("div", { class: "recipe__servings" }, [
-      el("span", { class: "muted small" }, "Cocinar para"),
-    ]);
-    for (const n of [1, 2, 3, 4]) {
-      const b = el("button", { class: "serv-chip", type: "button" }, String(n));
-      b.addEventListener("click", () => {
-        localStorage.setItem(SERV_KEY, String(n));
-        applyServings(refs);
-      });
-      btns.push({ n, b });
-      chips.append(b);
-    }
-    chips.append(el("span", { class: "muted small" }, "personas"));
-
-    if (ingredients?.length) {
-      const addBtn = el("button", { class: "add-shop-btn", type: "button" }, "🛒 Añadir a la compra");
-      addBtn.addEventListener("click", async () => {
-        addBtn.disabled = true;
-        const prev = addBtn.textContent;
-        addBtn.textContent = "Añadiendo…";
-        try {
-          const n = getServings();
-          await addIngredientsToShopping(ingredients, n);
-          toast(`Ingredientes añadidos a la compra (${n} ${n === 1 ? "persona" : "personas"})`);
-          refreshShoppingCard();
-          addBtn.textContent = "✓ Añadido";
-          setTimeout(() => { addBtn.textContent = prev; addBtn.disabled = false; }, 1800);
-        } catch (e) {
-          showError(e);
-          addBtn.textContent = prev;
-          addBtn.disabled = false;
-        }
-      });
-      chips.append(addBtn);
-    }
-    det.append(chips);
-  }
-
-  const body = el("div", { class: "recipe__body" });
-  det.append(body);
-  if (scalable) {
-    det.append(el("div", { class: "recipe__hint" },
-      "Tu ración (la del menú) no cambia: esto escala lo que cocinas. Si el horno o la airfryer van muy llenos, mejor en 2 tandas; los tiempos apenas cambian."));
-  }
-  refs.push({ raw, body, btns });
-  return det;
-}
-
-// Aplica el nº de personas guardado a todas las recetas de la página.
-function applyServings(refs) {
-  const n = getServings();
-  for (const r of refs) {
-    r.body.textContent = scaleRecipe(r.raw, n);
-    r.btns.forEach(({ n: bn, b }) => b.classList.toggle("serv-chip--on", bn === n));
-  }
-}
-
-// ---------------------------------------------------------------------------
-const DAY_NAMES = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
 
 function dietPlanCard(guidelines, meals) {
   const card = el("div", { class: "card" });
-  card.append(el("h2", { class: "card__title" }, "🍽 Plan de dieta semanal"));
+  card.append(el("h2", { class: "card__title" }, "🍽 Tu dieta"));
 
   // Pautas (agua, creatina, reglas)
   for (const g of guidelines) {
@@ -196,223 +101,262 @@ function dietPlanCard(guidelines, meals) {
     ]));
   }
 
-  // Menú por días (el de hoy, abierto)
-  const byDay = new Map();
-  for (const m of meals) {
-    if (!byDay.has(m.day_of_week)) byDay.set(m.day_of_week, []);
-    byDay.get(m.day_of_week).push(m);
-  }
-  const todayDow = ((new Date().getDay() + 6) % 7) + 1; // 1=lunes
-  const recipeRefs = []; // recetas de la página, para escalarlas todas a la vez
+  if (!meals.length) return card;
 
-  for (const [dow, items] of [...byDay.entries()].sort((a, b) => a[0] - b[0])) {
-    const box = el("details", { class: "menu-day", open: dow === todayDow });
-    box.append(el("summary", { class: "menu-day__summary" },
-      DAY_NAMES[dow - 1] + (dow === todayDow ? "  ·  HOY" : "")));
-    for (const m of items) {
-      box.append(el("div", { class: "menu-day__slot" }, [
-        el("div", { class: "menu-day__slotname" }, m.slot),
-        el("div", { class: "menu-day__menu" }, m.menu),
-        m.notes ? el("div", { class: "menu-day__notes" }, m.notes) : null,
-        m.recipe ? recipeBox(m.recipe, m.ingredients, recipeRefs) : null,
-        m.kids_menu ? el("details", { class: "kids" }, [
-          el("summary", { class: "kids__summary" }, "👧👦 Si comen los niños"),
-          el("div", { class: "kids__body" }, m.kids_menu),
-        ]) : null,
-      ]));
-    }
-    card.append(box);
-  }
-  applyServings(recipeRefs);
-  return card;
-}
+  card.append(el("h3", { class: "sub" }, "Cuaderno nutricional"));
+  card.append(el("p", { class: "muted small" },
+    "Ingrediente a ingrediente. Cambia la cantidad (×1 = ración normal) y los totales se recalculan solos."));
 
-// ---------------------------------------------------------------------------
-// Lista de la compra. Empieza vacía: se llena desde las recetas (botón 🛒),
-// sumando cantidades según el nº de personas elegido. Los tildes van en
-// localStorage; "Vaciar" borra la lista para empezar otra semana.
-const SHOP_KEY = "ft_shopping_checked";
-const CAT_ORDER = {
-  "🐟 Pescado y marisco": 10,
-  "🍗 Carne y huevos": 30,
-  "🥛 Lácteos y proteína": 40,
-  "🌾 Cereales y carbohidratos": 50,
-  "🥦 Fruta y verdura": 60,
-  "🧴 Suplementos y despensa": 80,
-};
+  // Un solo día representativo, ya que el menú es igual los 7 días.
+  const firstDow = Math.min(...meals.map((m) => m.day_of_week));
+  const dayMeals = meals.filter((m) => m.day_of_week === firstDow).sort((a, b) => a.slot_order - b.slot_order);
 
-function loadChecked() {
-  try { return new Set(JSON.parse(localStorage.getItem(SHOP_KEY) || "[]")); }
-  catch { return new Set(); }
-}
-function saveChecked(set) {
-  localStorage.setItem(SHOP_KEY, JSON.stringify([...set]));
-}
-
-// Unidades con plural natural ("2 bolsas", "1 bolsa").
-function fmtUnit(amount, unit) {
-  if (!unit || unit === "ud" || unit === "g" || unit === "ml") return unit || "";
-  return amount > 1 ? unit + "s" : unit;
-}
-function fmtShopQty(row) {
-  if (row.amount == null) return row.qty || "";
-  const a = Number(row.amount);
-  const n = a >= 10 ? String(Math.round(a)) : fmtQty(a);
-  return `${n} ${fmtUnit(a, row.unit)}`.trim();
-}
-
-let shopCardRef = null; // referencia viva para refrescar tras añadir desde recetas
-
-function shoppingCard(items) {
-  const card = el("div", { class: "card" });
-  shopCardRef = card;
-  fillShoppingCard(card, items);
-  return card;
-}
-
-async function refreshShoppingCard() {
-  if (!shopCardRef || !document.body.contains(shopCardRef)) return;
-  try { fillShoppingCard(shopCardRef, await ShoppingList.list()); }
-  catch (e) { console.warn(e); }
-}
-
-function fillShoppingCard(card, items) {
-  clear(card);
-  const checked = loadChecked();
-
-  card.append(el("div", { class: "shop-head" }, [
-    el("h2", { class: "card__title" }, "🛒 Lista de la compra"),
-    items.length ? el("button", { class: "btn btn--small btn--ghost", on: { click: async () => {
-      if (!confirmAction("¿Vaciar toda la lista de la compra?")) return;
-      try {
-        await ShoppingList.clear();
-        saveChecked(new Set());
-        refreshShoppingCard();
-      } catch (e) { showError(e); }
-    } } }, "Vaciar") : null,
+  const grandKcal = el("span", { class: "ledger-grand__kcal" }, "0");
+  const grandP = el("span", {}, "0 g");
+  const grandC = el("span", {}, "0 g");
+  const grandF = el("span", {}, "0 g");
+  card.append(el("div", { class: "ledger-summary" }, [
+    el("div", { class: "ledger-summary__top" }, [grandKcal, el("span", { class: "muted" }, " kcal / día")]),
+    el("div", { class: "ledger-summary__chips" }, [
+      el("span", { class: "ledger-chip" }, [el("span", { class: "ledger-dot ledger-dot--p" }), "Proteína ", grandP]),
+      el("span", { class: "ledger-chip" }, [el("span", { class: "ledger-dot ledger-dot--c" }), "Carbohidratos ", grandC]),
+      el("span", { class: "ledger-chip" }, [el("span", { class: "ledger-dot ledger-dot--f" }), "Grasa ", grandF]),
+    ]),
   ]));
 
-  if (!items.length) {
-    card.append(el("p", { class: "muted" },
-      "Lista vacía. Ábrela desde las recetas del plan: elige personas y pulsa «🛒 Añadir a la compra»."));
-    return;
-  }
+  const sections = []; // { total:{p,h,g,kcal}, active }
 
-  card.append(el("p", { class: "muted small" }, "Marca lo que vayas cogiendo. Añade más desde las recetas."));
-
-  const groups = new Map();
-  for (const it of items) {
-    if (!groups.has(it.category)) groups.set(it.category, []);
-    groups.get(it.category).push(it);
-  }
-
-  for (const [cat, list] of groups) {
-    card.append(el("h3", { class: "sub" }, cat));
-    for (const it of list) {
-      const box = el("input", { type: "checkbox" });
-      if (checked.has(it.id)) box.checked = true;
-      const row = el("label", { class: "shop-item" + (box.checked ? " shop-item--done" : "") }, [
-        box,
-        el("span", { class: "shop-item__name" }, it.item),
-        el("span", { class: "shop-item__qty" }, fmtShopQty(it)),
-      ]);
-      box.addEventListener("change", () => {
-        if (box.checked) checked.add(it.id); else checked.delete(it.id);
-        saveChecked(checked);
-        row.classList.toggle("shop-item--done", box.checked);
-      });
-      card.append(row);
+  function recalcGrand() {
+    let p = 0, h = 0, g = 0, kcal = 0;
+    for (const s of sections) {
+      if (!s.active) continue;
+      p += s.total.p; h += s.total.h; g += s.total.g; kcal += s.total.kcal;
     }
+    grandKcal.textContent = String(Math.round(kcal));
+    grandP.textContent = fmtG(p) + " g";
+    grandC.textContent = fmtG(h) + " g";
+    grandF.textContent = fmtG(g) + " g";
   }
-}
 
-// Añade los ingredientes de una receta (por ración × n personas), sumando
-// sobre lo que ya haya en la lista.
-async function addIngredientsToShopping(ingredients, n) {
-  const list = await ShoppingList.list();
-  for (const ing of ingredients) {
-    const add = Number(ing.amount) * n;
-    const ex = list.find(
-      (r) => r.item.toLowerCase() === ing.item.toLowerCase() && (r.unit || "") === (ing.unit || "") && r.amount != null
-    );
-    if (ex) {
-      await ShoppingList.update(ex.id, { amount: Number(ex.amount) + add });
-    } else {
-      await ShoppingList.insert({
-        category: ing.cat,
-        item: ing.item,
-        amount: add,
-        unit: ing.unit || null,
-        item_order: CAT_ORDER[ing.cat] || 90,
-      });
+  for (const m of dayMeals) {
+    const isOptional = /opcional/i.test(m.notes || "") || /opcional/i.test(m.menu || "");
+    const section = { total: { p: 0, h: 0, g: 0, kcal: 0 }, active: !isOptional };
+    sections.push(section);
+
+    const rows = [];
+    const tbody = el("tbody");
+    for (const ing of m.ingredients || []) {
+      const qty = el("input", { type: "number", class: "ledger-qty", value: "1", step: "0.25", min: "0" });
+      const outP = el("td", { class: "num" }, fmtG(ing.protein));
+      const outH = el("td", { class: "num" }, fmtG(ing.carbs));
+      const outG = el("td", { class: "num" }, fmtG(ing.fat));
+      const outK = el("td", { class: "num" }, String(Math.round(ing.kcal || 0)));
+      rows.push({ ing, qty, outP, outH, outG, outK });
+      tbody.append(el("tr", {}, [
+        el("td", {}, [ing.item, el("div", { class: "ledger-ref" }, `ración base: ${fmt(ing.amount, ing.amount < 10 ? 2 : 0)} ${ing.unit}`)]),
+        el("td", { class: "num" }, qty),
+        outP, outH, outG, outK,
+      ]));
     }
+
+    const subP = el("td", { class: "num" }, "0.0");
+    const subH = el("td", { class: "num" }, "0.0");
+    const subG = el("td", { class: "num" }, "0.0");
+    const subK = el("td", { class: "num" }, "0");
+
+    function recalcSection() {
+      let p = 0, h = 0, g = 0, kcal = 0;
+      for (const r of rows) {
+        const q = parseFloat(r.qty.value);
+        const n = isNaN(q) || q < 0 ? 0 : q;
+        const rp = (r.ing.protein || 0) * n, rh = (r.ing.carbs || 0) * n, rg = (r.ing.fat || 0) * n, rk = (r.ing.kcal || 0) * n;
+        r.outP.textContent = fmtG(rp); r.outH.textContent = fmtG(rh); r.outG.textContent = fmtG(rg); r.outK.textContent = String(Math.round(rk));
+        p += rp; h += rh; g += rg; kcal += rk;
+      }
+      subP.textContent = fmtG(p); subH.textContent = fmtG(h); subG.textContent = fmtG(g); subK.textContent = String(Math.round(kcal));
+      section.total = { p, h, g, kcal };
+      recalcGrand();
+    }
+    rows.forEach((r) => r.qty.addEventListener("input", recalcSection));
+
+    const table = el("table", { class: "table ledger-table" }, [
+      el("thead", {}, el("tr", {}, ["Ingrediente", "Cant.(×)", "Prot.", "Carb.", "Grasa", "Kcal"].map((h) => el("th", {}, h)))),
+      tbody,
+      el("tfoot", {}, el("tr", { class: "ledger-subtotal" }, [
+        el("td", {}, "Subtotal"), el("td", {}), subP, subH, subG, subK,
+      ])),
+    ]);
+
+    const headRight = [];
+    if (isOptional) {
+      const toggle = el("input", { type: "checkbox" });
+      toggle.addEventListener("change", () => { section.active = toggle.checked; recalcGrand(); });
+      headRight.push(el("label", { class: "ledger-toggle" }, [toggle, "incluir en el total"]));
+    }
+
+    card.append(el("div", { class: "ledger-section" }, [
+      el("div", { class: "ledger-section__head" }, [el("h4", { class: "ledger-section__title" }, m.slot), ...headRight]),
+      el("div", { class: "table-wrap" }, table),
+    ]));
+
+    recalcSection();
   }
+
+  return card;
 }
 
 // ---------------------------------------------------------------------------
-// Solo los "diales" que controlan el cálculo de macros. Los datos personales
-// (sexo, nacimiento, altura, actividad) viven en la vista Cuerpo.
-function profileCard(profile, root) {
+// Calculadora de macros: recrea la calculadora que ya usaba el usuario
+// (TMB → Gasto Energético → TDEE → Objetivo % → macros). Los diales se
+// recalculan en vivo con la MISMA función (computeMacros) que usa el resto
+// de la app, así la previsualización nunca se desincroniza del cálculo real.
+// "Guardar" persiste en profile para que Dashboard y el resto de la app usen
+// estos valores.
+function calculatorCard(profile, latest, root) {
   const card = el("div", { class: "card" });
-  card.append(el("h2", { class: "card__title" }, "Diales de nutrición"));
+  card.append(el("h2", { class: "card__title" }, "🧮 Calculadora de macros"));
 
   if (!profile) {
     card.append(el("p", { class: "warn" }, "No hay fila de perfil. Ejecuta db/schema.sql (crea una por defecto)."));
     return card;
   }
+  if (!latest) {
+    card.append(el("p", { class: "muted" }, "Necesitas una medición de peso (pestaña Cuerpo) para calcular."));
+    return card;
+  }
 
   card.append(el("p", { class: "muted small" },
-    "Controlan el cálculo de macros. Se ajustan según tu progreso — normalmente los toco yo (Claude)."));
+    "Cambia cualquier dial y los totales se recalculan solos. Pulsa Guardar para que el Dashboard y el resto de la app usen estos valores."));
 
-  const form = el("form", { class: "form-grid" });
-  const inputs = {};
+  // ---- Diales interactivos ---------------------------------------------------
+  const activitySel = el("select", {});
+  for (const [val, txt] of Object.entries(LABELS.activity_level)) {
+    activitySel.append(el("option", { value: val, selected: profile.activity_level === val }, txt));
+  }
+  const pctInput = el("input", { type: "number", step: "1", value: profile.calorie_adjustment_pct ?? 0, inputmode: "decimal" });
+  const proteinInput = el("input", { type: "number", step: "0.1", value: profile.protein_g_per_kg ?? "", inputmode: "decimal" });
+  const fatInput = el("input", { type: "number", step: "0.1", value: profile.fat_g_per_kg ?? "", inputmode: "decimal" });
 
-  const select = (name, label, options, value) => {
-    const sel = el("select", { name });
-    for (const [val, txt] of Object.entries(options)) {
-      sel.append(el("option", { value: val, selected: value === val }, txt));
-    }
-    inputs[name] = sel;
-    return el("label", { class: "field" }, [el("span", {}, label), sel]);
-  };
-  const num = (name, label, value, step = "any") => {
-    const input = el("input", { type: "number", name, step, value: value ?? "", inputmode: "decimal" });
-    inputs[name] = input;
-    return el("label", { class: "field" }, [el("span", {}, label), input]);
-  };
+  const goalSel = el("select", {});
+  for (const [val, txt] of Object.entries(LABELS.goal)) {
+    goalSel.append(el("option", { value: val, selected: profile.goal === val }, txt));
+  }
+  const overrideInput = el("input", {
+    type: "number", step: "any", value: profile.manual_calorie_override ?? "",
+    inputmode: "decimal", placeholder: "vacío = automático",
+  });
+  const notesInput = el("input", { type: "text", value: profile.notes || "" });
 
-  form.append(select("goal", "Objetivo", LABELS.goal, profile.goal));
-  form.append(num("calorie_adjustment_kcal", "Ajuste kcal (déficit/superávit)", profile.calorie_adjustment_kcal));
-  form.append(num("manual_calorie_override", "Override kcal manual (vacío = auto)", profile.manual_calorie_override));
-  form.append(num("protein_g_per_kg", "Proteína g/kg", profile.protein_g_per_kg));
-  form.append(num("fat_pct_of_calories", "% calorías de grasa (0-1)", profile.fat_pct_of_calories));
+  // ---- Celdas de resultado (se rellenan en recalc) ---------------------------
+  const outBmr = el("td", { class: "num" }, "—");
+  const outTdeeIni = el("td", { class: "num" }, "—");
+  const outAdjust = el("td", { class: "num" }, "—");
+  const outTdeeFinal = el("td", { class: "num" }, "—");
+  const outProteinG = el("td", { class: "num" }, "—");
+  const outProteinK = el("td", { class: "num" }, "—");
+  const outFatG = el("td", { class: "num" }, "—");
+  const outFatK = el("td", { class: "num" }, "—");
+  const outCarbsG = el("td", { class: "num" }, "—");
+  const outCarbsK = el("td", { class: "num" }, "—");
+  const outTotalG = el("td", { class: "num" }, "—");
+  const outTotalK = el("td", { class: "num" }, "—");
+  const warnBox = el("div", {});
 
-  const notes = el("input", { type: "text", name: "notes", value: profile.notes || "", placeholder: "Notas" });
-  inputs.notes = notes;
-  form.append(el("label", { class: "field field--wide" }, [el("span", {}, "Notas"), notes]));
+  function recalc() {
+    const draft = {
+      ...profile,
+      goal: goalSel.value,
+      activity_level: activitySel.value,
+      calorie_adjustment_pct: Number(pctInput.value) || 0,
+      protein_g_per_kg: Number(proteinInput.value) || 0,
+      fat_g_per_kg: Number(fatInput.value) || 0,
+      manual_calorie_override: overrideInput.value.trim() === "" ? null : Number(overrideInput.value),
+    };
+    const m = computeMacros(draft, latest);
+    clear(warnBox);
+    if (!m) return;
 
-  form.append(el("button", { type: "submit", class: "btn btn--primary field--wide" }, "Guardar diales"));
+    outBmr.textContent = fmt(m.bmr, 0);
+    outTdeeIni.textContent = fmt(m.tdee, 0);
+    outAdjust.textContent = (m.adjustmentKcal > 0 ? "+" : "") + fmt(m.adjustmentKcal, 0);
+    outTdeeFinal.textContent = fmt(m.targetCalories, 0);
 
-  form.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const patch = {};
-    for (const [name, input] of Object.entries(inputs)) {
-      const v = input.value.trim();
-      if (input.type === "number") {
-        patch[name] = v === "" ? null : Number(v);
-      } else {
-        patch[name] = v === "" ? null : v;
-      }
-    }
+    outProteinG.textContent = fmt(m.protein.g, 0);
+    outProteinK.textContent = fmt(m.protein.kcal, 0);
+    outFatG.textContent = fmt(m.fat.g, 0);
+    outFatK.textContent = fmt(m.fat.kcal, 0);
+    outCarbsG.textContent = fmt(m.carbs.g, 0);
+    outCarbsK.textContent = fmt(m.carbs.kcal, 0);
+    const totalG = (m.protein.g || 0) + (m.carbs.g || 0) + (m.fat.g || 0);
+    const totalK = (m.protein.kcal || 0) + (m.carbs.kcal || 0) + (m.fat.kcal || 0);
+    outTotalG.textContent = fmt(totalG, 0);
+    outTotalK.textContent = fmt(totalK, 0);
+
+    (m.warnings || []).forEach((w) => warnBox.append(el("p", { class: "warn" }, "⚠ " + w)));
+  }
+  [activitySel, pctInput, proteinInput, fatInput, overrideInput].forEach((inp) => {
+    inp.addEventListener("input", recalc);
+    inp.addEventListener("change", recalc);
+  });
+
+  // ---- Tabla 1: TMB → TDEE → objetivo ----------------------------------------
+  const age = profile.birth_date ? ageFrom(profile.birth_date) : null;
+  card.append(el("div", { class: "table-wrap" }, el("table", { class: "table calc-table" }, [
+    el("tbody", {}, [
+      el("tr", {}, [el("td", {}, "Peso (kg)"), el("td", { class: "num" }, fmt(latest.weight_kg))]),
+      el("tr", {}, [el("td", {}, "Edad"), el("td", { class: "num" }, age ?? "—")]),
+      el("tr", {}, [el("td", {}, "Altura (cm)"), el("td", { class: "num" }, profile.height_cm ?? "—")]),
+      el("tr", {}, [el("td", {}, "TMB"), outBmr]),
+      el("tr", {}, [el("td", {}, "Gasto energético"), el("td", { class: "num" }, activitySel)]),
+      el("tr", { class: "calc-subtotal" }, [el("td", {}, "TDEE inicial"), outTdeeIni]),
+      el("tr", {}, [el("td", {}, "Objetivo (%)"), el("td", { class: "num" }, pctInput)]),
+      el("tr", {}, [el("td", {}, "Ajuste (kcal)"), outAdjust]),
+      el("tr", { class: "calc-highlight" }, [el("td", {}, "TDEE final (objetivo)"), outTdeeFinal]),
+    ]),
+  ])));
+
+  // ---- Tabla 2: macros --------------------------------------------------------
+  card.append(el("div", { class: "table-wrap" }, el("table", { class: "table calc-table" }, [
+    el("thead", {}, el("tr", {}, ["", "g/kg", "Gramos", "Kcal"].map((h) => el("th", {}, h)))),
+    el("tbody", {}, [
+      el("tr", {}, [el("td", {}, "Proteína"), el("td", { class: "num" }, proteinInput), outProteinG, outProteinK]),
+      el("tr", {}, [el("td", {}, "Grasa"), el("td", { class: "num" }, fatInput), outFatG, outFatK]),
+      el("tr", {}, [el("td", {}, "Carbohidratos"), el("td", { class: "num muted small" }, "resto"), outCarbsG, outCarbsK]),
+    ]),
+    el("tfoot", {}, el("tr", { class: "calc-highlight" }, [el("td", {}, "TOTAL"), el("td", {}), outTotalG, outTotalK])),
+  ])));
+
+  card.append(warnBox);
+
+  // ---- Objetivo, override manual, notas, guardar -----------------------------
+  card.append(el("div", { class: "form-grid" }, [
+    el("label", { class: "field" }, [el("span", {}, "Objetivo"), goalSel]),
+    el("label", { class: "field" }, [el("span", {}, "Override kcal manual"), overrideInput]),
+    el("label", { class: "field field--wide" }, [el("span", {}, "Notas"), notesInput]),
+  ]));
+
+  const saveBtn = el("button", { class: "btn btn--primary field--wide", type: "button" }, "Guardar");
+  saveBtn.addEventListener("click", async () => {
+    saveBtn.disabled = true;
     try {
-      await Profile.update(profile.id, patch);
-      toast("Diales actualizados");
+      await Profile.update(profile.id, {
+        goal: goalSel.value,
+        activity_level: activitySel.value,
+        calorie_adjustment_pct: Number(pctInput.value) || 0,
+        protein_g_per_kg: Number(proteinInput.value) || 0,
+        fat_g_per_kg: Number(fatInput.value) || 0,
+        manual_calorie_override: overrideInput.value.trim() === "" ? null : Number(overrideInput.value),
+        notes: notesInput.value.trim() || null,
+      });
+      toast("Calculadora guardada");
       renderNutrition(root);
     } catch (err) {
       showError(err);
+      saveBtn.disabled = false;
     }
   });
+  card.append(saveBtn);
 
-  card.append(form);
+  recalc();
   return card;
 }

@@ -553,113 +553,6 @@ input[type="checkbox"] { width: 24px; height: 24px; min-height: 0; accent-color:
 .diet-guide__title { font-weight: 700; font-size: 0.92rem; margin-bottom: 3px; }
 .diet-guide__body { font-size: 0.86rem; color: var(--text-dim); line-height: 1.45; }
 
-.menu-day {
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  margin-top: 10px;
-  background: var(--card-2);
-  overflow: hidden;
-}
-.menu-day__summary {
-  cursor: pointer;
-  list-style: none;
-  padding: 12px 14px;
-  font-weight: 700;
-  font-size: 0.95rem;
-}
-.menu-day__summary::-webkit-details-marker { display: none; }
-.menu-day__summary::before { content: "▸ "; color: var(--primary); }
-.menu-day[open] .menu-day__summary::before { content: "▾ "; }
-.menu-day__slot { padding: 10px 14px; border-top: 1px solid var(--border); }
-.menu-day__slotname { font-size: 0.78rem; font-weight: 700; color: var(--primary); text-transform: uppercase; letter-spacing: 0.3px; }
-.menu-day__menu { font-size: 0.92rem; margin-top: 2px; line-height: 1.45; }
-.menu-day__notes { font-size: 0.8rem; color: var(--muted); margin-top: 3px; font-style: italic; }
-
-/* Receta desplegable dentro de cada comida/cena */
-.recipe { margin-top: 8px; }
-.recipe__summary {
-  cursor: pointer;
-  list-style: none;
-  display: inline-block;
-  font-size: 0.85rem;
-  font-weight: 700;
-  color: var(--primary);
-  padding: 6px 12px;
-  border: 1px solid var(--primary);
-  border-radius: 999px;
-}
-.recipe__summary::-webkit-details-marker { display: none; }
-.recipe[open] .recipe__summary { background: color-mix(in srgb, var(--primary) 15%, transparent); }
-.recipe__body {
-  white-space: pre-line;
-  font-size: 0.88rem;
-  line-height: 1.55;
-  color: var(--text);
-  background: var(--bg-2);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  padding: 10px 12px;
-  margin-top: 8px;
-}
-.recipe__servings {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
-  margin-top: 10px;
-}
-.serv-chip {
-  min-width: 40px;
-  min-height: 40px;
-  border-radius: 10px;
-  border: 1px solid var(--border);
-  background: var(--card-2);
-  color: var(--text);
-  font-weight: 700;
-  font-size: 0.95rem;
-  cursor: pointer;
-}
-.serv-chip--on { background: var(--primary); color: var(--primary-ink); border-color: transparent; }
-.add-shop-btn {
-  min-height: 40px;
-  padding: 8px 14px;
-  border-radius: 999px;
-  border: 1px solid var(--ok);
-  background: color-mix(in srgb, var(--ok) 14%, transparent);
-  color: var(--ok);
-  font-weight: 700;
-  font-size: 0.85rem;
-  cursor: pointer;
-}
-.add-shop-btn:disabled { opacity: 0.7; }
-.recipe__hint { font-size: 0.74rem; color: var(--muted); margin-top: 6px; font-style: italic; }
-
-/* Versión niños de cada comida/cena */
-.kids { margin-top: 8px; }
-.kids__summary {
-  cursor: pointer;
-  list-style: none;
-  display: inline-block;
-  font-size: 0.85rem;
-  font-weight: 700;
-  color: var(--warn);
-  padding: 6px 12px;
-  border: 1px solid var(--warn);
-  border-radius: 999px;
-}
-.kids__summary::-webkit-details-marker { display: none; }
-.kids[open] .kids__summary { background: color-mix(in srgb, var(--warn) 15%, transparent); }
-.kids__body {
-  white-space: pre-line;
-  font-size: 0.88rem;
-  line-height: 1.55;
-  color: var(--text);
-  background: color-mix(in srgb, var(--warn) 7%, var(--bg-2));
-  border: 1px solid color-mix(in srgb, var(--warn) 40%, var(--border));
-  border-radius: var(--radius-sm);
-  padding: 10px 12px;
-  margin-top: 8px;
-}
 
 /* ---- Importar CSV ------------------------------------------------------------ */
 .import-card__summary {
@@ -674,22 +567,70 @@ input[type="checkbox"] { width: 24px; height: 24px; min-height: 0; accent-color:
 .import-card[open] .import-card__summary { margin-bottom: 10px; }
 .import-status { font-size: 0.88rem; color: var(--text-dim); margin-top: 6px; min-height: 1.2em; }
 
-/* ---- Lista de la compra ------------------------------------------------------ */
-.shop-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-.shop-head .card__title { margin: 0; }
-.shop-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 11px 4px;
-  border-bottom: 1px solid var(--border);
-  cursor: pointer;
+/* ---- Cuaderno nutricional (desglose por ingrediente) ------------------------- */
+.ledger-summary {
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  margin: 10px 0 16px;
 }
-.shop-item:last-child { border-bottom: none; }
-.shop-item__name { flex: 1 1 auto; }
-.shop-item__qty { color: var(--muted); font-size: 0.82rem; text-align: right; flex: 0 0 auto; }
-.shop-item--done .shop-item__name { text-decoration: line-through; color: var(--muted); }
-.shop-item--done { opacity: 0.6; }
+.ledger-summary__top { display: flex; align-items: baseline; gap: 6px; }
+.ledger-grand__kcal { font-size: 1.9rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+.ledger-summary__chips { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+.ledger-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 0.8rem; padding: 4px 10px; border-radius: 999px;
+  background: var(--card-2); border: 1px solid var(--border);
+  font-variant-numeric: tabular-nums;
+}
+.ledger-dot { width: 8px; height: 8px; border-radius: 50%; }
+.ledger-dot--p { background: var(--danger); }
+.ledger-dot--c { background: var(--warn); }
+.ledger-dot--f { background: var(--ok); }
+
+.ledger-section { margin-top: 18px; }
+.ledger-section__head {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  flex-wrap: wrap;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 6px; margin-bottom: 8px;
+}
+.ledger-section__title { margin: 0; font-size: 1rem; }
+.ledger-toggle { display: inline-flex; align-items: center; gap: 6px; font-size: 0.8rem; color: var(--muted); }
+.ledger-toggle input { width: 18px; height: 18px; min-height: 0; }
+
+.ledger-table { font-size: 0.86rem; }
+.ledger-table th:first-child, .ledger-table td:first-child { min-width: 8rem; }
+.ledger-table .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ledger-ref { font-size: 0.72rem; color: var(--muted); margin-top: 2px; }
+.ledger-table input.ledger-qty {
+  width: 3.6rem; min-height: 38px; padding: 4px 6px;
+  text-align: right; font-variant-numeric: tabular-nums;
+}
+tr.ledger-subtotal td { font-weight: 700; border-top: 2px solid var(--text-dim); }
+
+/* ---- Calculadora de macros ---------------------------------------------------- */
+.calc-table { font-size: 0.92rem; margin-bottom: 16px; }
+.calc-table td:first-child { color: var(--text-dim); }
+.calc-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+.calc-table select, .calc-table input[type="number"] {
+  min-height: 40px;
+  padding: 6px 8px;
+  width: auto;
+  min-width: 5rem;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.calc-table select { text-align: left; min-width: 11rem; }
+tr.calc-subtotal td { border-top: 1px solid var(--border); font-weight: 600; padding-top: 10px; }
+tr.calc-highlight td {
+  font-weight: 800;
+  font-size: 1.05rem;
+  border-top: 2px solid var(--primary);
+  padding-top: 10px;
+  color: var(--primary);
+}
 
 /* ---- Responsive móvil (iPhone y similares) ---------------------------------- */
 @media (max-width: 480px) {

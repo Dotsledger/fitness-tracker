@@ -21,13 +21,14 @@ create table if not exists profile (
   sex text check (sex in ('male','female')) default 'male',
   birth_date date,
   height_cm numeric,
-  activity_level text check (activity_level in ('sedentary','light','moderate','high','athlete')) default 'moderate',
+  -- multiplicadores: sedentary=1.2 · light_low=1.35 · light=1.375 · moderate=1.55 · high=1.725 · athlete=1.9
+  activity_level text check (activity_level in ('sedentary','light_low','light','moderate','high','athlete')) default 'moderate',
   goal text check (goal in ('cut','bulk','maintain','recomp')) default 'recomp',
-  formula text default 'katch_mcardle',
-  calorie_adjustment_kcal numeric default 0,   -- déficit/superávit manual sobre el TDEE calculado
+  formula text default 'mifflin_st_jeor',
+  calorie_adjustment_pct numeric default 0,    -- % de ajuste sobre el TDEE inicial (+superávit/-déficit)
   manual_calorie_override numeric,             -- si se rellena, ignora el cálculo automático
   protein_g_per_kg numeric default 2.2,        -- gramos de proteína por kg de peso total
-  fat_pct_of_calories numeric default 0.25,
+  fat_g_per_kg numeric default 0.8,            -- gramos de grasa por kg de peso total
   notes text,
   updated_at timestamptz default now()
 );
@@ -142,17 +143,6 @@ create table if not exists meal_plan (
   kids_menu text             -- adaptación del plato para los niños (desplegable)
 );
 
--- Lista de la compra: empieza vacía; se llena desde las recetas de la app
--- (botón 🛒), sumando amount por (item, unit).
-create table if not exists shopping_list (
-  id uuid primary key default gen_random_uuid(),
-  category text not null,
-  item text not null,
-  qty text,                  -- legado (texto libre); la app usa amount+unit
-  amount numeric,
-  unit text,
-  item_order int
-);
 
 -- ============================================================================
 -- Row Level Security
@@ -178,7 +168,7 @@ declare
   tables text[] := array[
     'profile','body_metrics','exercises','routine_days',
     'routine_exercises','workout_sessions','workout_sets',
-    'diet_guidelines','meal_plan','shopping_list'
+    'diet_guidelines','meal_plan'
   ];
 begin
   foreach t in array tables loop
@@ -198,8 +188,8 @@ end $$;
 -- Semilla mínima
 -- ============================================================================
 -- Crea la fila única de profile solo si aún no existe ninguna.
-insert into profile (goal, calorie_adjustment_kcal, protein_g_per_kg, fat_pct_of_calories, activity_level)
-select 'recomp', -125, 2.2, 0.25, 'moderate'
+insert into profile (goal, calorie_adjustment_pct, protein_g_per_kg, fat_g_per_kg, activity_level)
+select 'recomp', -15, 2.2, 0.8, 'moderate'
 where not exists (select 1 from profile);
 
 -- (Opcional) unos días de rutina vacíos para empezar. Descomenta si quieres.

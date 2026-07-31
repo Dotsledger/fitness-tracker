@@ -17,9 +17,10 @@
 export const SUPABASE_URL = "https://unpillxzxkyoahietzrj.supabase.co";
 export const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVucGlsbHh6eGt5b2FoaWV0enJqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM5Mzc4OTAsImV4cCI6MjA5OTUxMzg5MH0.W_IR5ILddQWCGn96Vu50AqyYYc6gzRZjgl01SgRaWAE";
 
-// Multiplicadores de actividad para el cálculo de TDEE (Katch-McArdle).
+// Multiplicadores de actividad para el cálculo de TDEE (Mifflin-St Jeor).
 export const ACTIVITY_MULTIPLIERS = {
   sedentary: 1.2,
+  light_low: 1.35,
   light: 1.375,
   moderate: 1.55,
   high: 1.725,
@@ -29,11 +30,12 @@ export const ACTIVITY_MULTIPLIERS = {
 // Etiquetas legibles para los selects de la UI.
 export const LABELS = {
   activity_level: {
-    sedentary: "Sedentario",
-    light: "Ligero",
-    moderate: "Moderado",
-    high: "Alto",
-    athlete: "Atleta",
+    sedentary: "Ningún ejercicio",
+    light_low: "Ligero bajo",
+    light: "Ligero (1-3 días)",
+    moderate: "Moderado (3-5 días)",
+    high: "Fuerte (6-7 días)",
+    athlete: "Muy fuerte (2 sesiones)",
   },
   goal: {
     cut: "Definición (cut)",
