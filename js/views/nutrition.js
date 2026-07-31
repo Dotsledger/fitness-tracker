@@ -222,8 +222,7 @@ function dietPlanCard(meals) {
 // (TMB → Gasto Energético → TDEE → Objetivo % → macros). Los diales se
 // recalculan en vivo con la MISMA función (computeMacros) que usa el resto
 // de la app, así la previsualización nunca se desincroniza del cálculo real.
-// "Guardar" persiste en profile para que Dashboard y el resto de la app usen
-// estos valores.
+// "Guardar" persiste en profile para que el resto de la app use estos valores.
 function calculatorCard(profile, latest, root) {
   const card = el("div", { class: "card" });
   card.append(el("h2", { class: "card__title" }, "🧮 Calculadora de macros"));
@@ -238,7 +237,7 @@ function calculatorCard(profile, latest, root) {
   }
 
   card.append(el("p", { class: "muted small" },
-    "Cambia cualquier dial y los totales se recalculan solos. Pulsa Guardar para que el Dashboard y el resto de la app usen estos valores."));
+    "Cambia cualquier dial y los totales se recalculan solos. Pulsa Guardar para que el resto de la app use estos valores."));
 
   // ---- Diales interactivos ---------------------------------------------------
   const activitySel = el("select", {});

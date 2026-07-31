@@ -6,7 +6,6 @@ import { CONFIGURED } from "./db.js";
 import { defineRoute, setOutlet, setNotFound, startRouter } from "./router.js";
 import { el } from "./utils.js";
 
-import { renderDashboard } from "./views/dashboard.js";
 import { renderRoutine } from "./views/routine.js";
 import { renderWorkout } from "./views/workout.js";
 import { renderHistory } from "./views/history.js";
@@ -15,7 +14,6 @@ import { renderBody } from "./views/body.js";
 import { renderExercises } from "./views/exercises.js";
 
 const NAV = [
-  { path: "/", label: "Inicio", icon: "🏠" },
   { path: "/workout", label: "Entreno", icon: "🏋" },
   { path: "/routine", label: "Rutina", icon: "🗓" },
   { path: "/history", label: "Historial", icon: "📈" },
@@ -52,7 +50,7 @@ function boot() {
     return fn(root, param);
   };
 
-  defineRoute("/", guard(renderDashboard));
+  defineRoute("/", guard(renderWorkout));
   defineRoute("/workout", guard(renderWorkout));
   defineRoute("/routine", guard(renderRoutine));
   defineRoute("/history", guard(renderHistory));
@@ -61,7 +59,7 @@ function boot() {
   defineRoute("/body", guard(renderBody));
   defineRoute("/exercises", guard(renderExercises));
   setNotFound((root) => {
-    root.innerHTML = `<div class="empty"><div class="empty__title">Página no encontrada</div><a class="btn" href="#/">Ir al inicio</a></div>`;
+    root.innerHTML = `<div class="empty"><div class="empty__title">Página no encontrada</div><a class="btn" href="#/">Ir a Entreno</a></div>`;
   });
 
   buildChrome();
