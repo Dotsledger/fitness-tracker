@@ -47,8 +47,10 @@ export const BodyMetrics = {
     return run(sb.from("body_metrics").select("*").order("measured_at", { ascending: false }).limit(1))
       .then((r) => r[0] || null);
   },
+  // Las N mediciones más RECIENTES, devueltas en orden ascendente (para gráficas).
   list(limit = 500) {
-    return run(sb.from("body_metrics").select("*").order("measured_at", { ascending: true }).limit(limit));
+    return run(sb.from("body_metrics").select("*").order("measured_at", { ascending: false }).limit(limit))
+      .then((rows) => rows.reverse());
   },
   insert(row) {
     return run(sb.from("body_metrics").insert(row).select().single());
