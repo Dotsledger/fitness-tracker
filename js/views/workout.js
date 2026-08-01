@@ -8,10 +8,10 @@
 // ============================================================================
 
 import {
-  RoutineDays, RoutineExercises, WorkoutSessions, WorkoutSets,
+  RoutineDays, RoutineExercises, RoutinePrograms, RoutineSchedule, WorkoutSessions, WorkoutSets,
 } from "../db.js";
 import {
-  el, clear, loading, today, fmtDate, toast, showError, confirmAction, emptyState,
+  el, clear, loading, today, fmtDate, toast, showError, confirmAction, emptyState, weekdayIndex,
 } from "../utils.js";
 import { navigate } from "../router.js";
 import { exerciseIcon } from "../exercise-icons.js";
@@ -102,7 +102,11 @@ const RestTimer = (() => {
 
 export async function renderWorkout(root) {
   loading(root);
-  const days = await RoutineDays.list();
+  const program = await RoutinePrograms.active();
+  const [days, schedule] = await Promise.all([
+    RoutineDays.list(program ? { programId: program.id } : {}),
+    program ? RoutineSchedule.byProgram(program.id) : Promise.resolve([]),
+  ]);
   clear(root);
   root.append(el("h1", { class: "view-title" }, "Registrar entreno"));
 
@@ -119,6 +123,17 @@ export async function renderWorkout(root) {
   const dateInput = el("input", { type: "date", value: today() });
   const daySel = el("select", {});
   days.forEach((d) => daySel.append(el("option", { value: d.id }, d.name)));
+
+  // Preselección según el calendario semanal del programa activo: el día de
+  // fuerza asignado a la fecha elegida (si lo hay). Cambiar la fecha re-elige.
+  const preselect = () => {
+    const slot = schedule.find((s) => s.weekday === weekdayIndex(dateInput.value));
+    if (slot?.routine_day_id && days.some((d) => d.id === slot.routine_day_id)) {
+      daySel.value = slot.routine_day_id;
+    }
+  };
+  preselect();
+  dateInput.addEventListener("change", preselect);
   form.append(
     el("label", { class: "field" }, [el("span", {}, "Fecha"), dateInput]),
     el("label", { class: "field" }, [el("span", {}, "Día"), daySel]),

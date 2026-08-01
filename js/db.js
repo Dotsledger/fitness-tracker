@@ -84,11 +84,61 @@ export const Exercises = {
   },
 };
 
+// ---- Programas de rutina (bloques de entrenamiento, uno activo a la vez) ----
+export const RoutinePrograms = {
+  list() {
+    return run(sb.from("routine_programs").select("*").order("created_at", { ascending: true }));
+  },
+  async active() {
+    const rows = await run(sb.from("routine_programs").select("*").eq("is_active", true).limit(1));
+    return rows[0] || null;
+  },
+  insert(row) {
+    return run(sb.from("routine_programs").insert(row).select().single());
+  },
+  update(id, patch) {
+    return run(sb.from("routine_programs").update(patch).eq("id", id).select().single());
+  },
+  remove(id) {
+    return run(sb.from("routine_programs").delete().eq("id", id));
+  },
+  // Activa un programa desactivando el resto (2 llamadas, sin transacción:
+  // aceptable en app monousuario; el peor caso es 0 activos, no 2).
+  async activate(id) {
+    await run(sb.from("routine_programs").update({ is_active: false }).neq("id", id).select());
+    return run(sb.from("routine_programs").update({ is_active: true }).eq("id", id).select().single());
+  },
+};
+
+// ---- Calendario semanal del programa (weekday 0=lunes … 6=domingo) ----------
+export const RoutineSchedule = {
+  byProgram(programId) {
+    return run(
+      sb.from("routine_schedule")
+        .select("*, day:routine_days(*)")
+        .eq("program_id", programId)
+        .order("weekday", { ascending: true })
+    );
+  },
+  // Upsert por (programa, día de semana): crea la fila si no existía.
+  set(programId, weekday, patch) {
+    return run(
+      sb.from("routine_schedule")
+        .upsert({ program_id: programId, weekday, ...patch }, { onConflict: "program_id,weekday" })
+        .select()
+    );
+  },
+  insert(row) {
+    return run(sb.from("routine_schedule").insert(row).select().single());
+  },
+};
+
 // ---- Routine days ----------------------------------------------------------
 export const RoutineDays = {
-  list({ includeInactive = false } = {}) {
+  list({ includeInactive = false, programId = null } = {}) {
     let q = sb.from("routine_days").select("*").order("day_order", { ascending: true });
     if (!includeInactive) q = q.eq("is_active", true);
+    if (programId) q = q.eq("program_id", programId);
     return run(q);
   },
   insert(row) {
@@ -192,6 +242,15 @@ export const WorkoutSessions = {
   },
   remove(id) {
     return run(sb.from("workout_sessions").delete().eq("id", id));
+  },
+  // ¿Existe alguna sesión registrada con alguno de estos días de rutina?
+  // (para impedir borrar un programa cuyo historial se perdería en cascada)
+  async hasAnyForDays(dayIds) {
+    if (!dayIds.length) return false;
+    const rows = await run(
+      sb.from("workout_sessions").select("id").in("routine_day_id", dayIds).limit(1)
+    );
+    return rows.length > 0;
   },
   // Nº de sesiones en los últimos `days` días (para la racha del dashboard).
   async recent(days = 30) {

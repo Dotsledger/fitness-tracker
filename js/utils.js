@@ -73,6 +73,16 @@ export function daysAgo(iso) {
   return Math.round((now - then) / 86400000);
 }
 
+// Días de la semana empezando en lunes (convención del calendario de rutina).
+export const WEEKDAYS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
+
+// Índice de día de semana 0=lunes … 6=domingo para una fecha ISO (YYYY-MM-DD).
+export function weekdayIndex(iso) {
+  if (!iso) return null;
+  const d = new Date(iso.slice(0, 10) + "T00:00:00"); // medianoche local, sin deriva UTC
+  return (d.getDay() + 6) % 7;
+}
+
 export function ageFrom(birthIso) {
   if (!birthIso) return null;
   const b = new Date(birthIso);

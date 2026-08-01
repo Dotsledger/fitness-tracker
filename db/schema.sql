@@ -66,13 +66,38 @@ create table if not exists exercises (
 );
 
 -- ----------------------------------------------------------------------------
--- Días de rutina (ej. Push / Pull / Legs)
+-- Programas de rutina (bloques de entrenamiento; solo uno activo a la vez,
+-- lo garantiza la app al activar — no hay trigger)
+-- ----------------------------------------------------------------------------
+create table if not exists routine_programs (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  is_active boolean default false,
+  created_at timestamptz default now()
+);
+
+-- ----------------------------------------------------------------------------
+-- Días de rutina (ej. Push / Pull / Legs) — cada día pertenece a un programa
 -- ----------------------------------------------------------------------------
 create table if not exists routine_days (
   id uuid primary key default gen_random_uuid(),
   name text not null,
   day_order int,
-  is_active boolean default true
+  is_active boolean default true,
+  program_id uuid references routine_programs(id) on delete cascade
+);
+
+-- ----------------------------------------------------------------------------
+-- Calendario semanal por programa: qué día de rutina (fuerza) toca cada día
+-- de la semana, más una nota libre (cardio, descanso...).
+-- ----------------------------------------------------------------------------
+create table if not exists routine_schedule (
+  id uuid primary key default gen_random_uuid(),
+  program_id uuid not null references routine_programs(id) on delete cascade,
+  weekday int not null check (weekday between 0 and 6), -- 0=lunes … 6=domingo
+  routine_day_id uuid references routine_days(id) on delete set null, -- null = sin fuerza ese día
+  note text,
+  unique (program_id, weekday)
 );
 
 -- ----------------------------------------------------------------------------
@@ -180,7 +205,8 @@ declare
   tables text[] := array[
     'profile','body_metrics','exercises','routine_days',
     'routine_exercises','workout_sessions','workout_sets',
-    'foods','meal_slots','meal_items'
+    'foods','meal_slots','meal_items',
+    'routine_programs','routine_schedule'
   ];
 begin
   foreach t in array tables loop

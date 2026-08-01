@@ -238,6 +238,20 @@ input[type="checkbox"] { width: 24px; height: 24px; min-height: 0; accent-color:
 .chevron { font-size: 1.6rem; color: var(--muted); }
 .move-sel { min-height: 40px; padding: 6px 26px 6px 10px; width: auto; font-size: 0.85rem; }
 
+/* ---- Calendario semanal (Rutina) ------------------------------------------- */
+.week-row__day {
+  flex: 0 0 7.5rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-dim);
+}
+.week-row--today {
+  border-left: 3px solid var(--primary);
+  padding-left: 8px;
+  background: color-mix(in srgb, var(--primary) 8%, transparent);
+}
+.week-row--today .week-row__day { color: var(--primary); }
+
 /* ---- Day head ------------------------------------------------------------- */
 .day-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; margin-bottom: 8px; }
 .day-head .card__title { margin: 0; }

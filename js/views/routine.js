@@ -1,24 +1,40 @@
 // ============================================================================
-// Vista: Rutina (días + asignación de ejercicios)
+// Vista: Rutina (calendario semanal + días del programa activo)
+// Los días pertenecen a programas (routine_programs); aquí solo se ve el
+// programa activo. El calendario asigna fuerza+cardio a cada día de la semana.
 // Reordenar: arrastrando el tirador (⋮⋮). Acciones: menú ⋯ por fila/día.
 // ============================================================================
 
-import { RoutineDays, RoutineExercises, Exercises } from "../db.js";
-import { el, clear, loading, toast, showError, confirmAction, emptyState } from "../utils.js";
+import { RoutineDays, RoutineExercises, RoutinePrograms, RoutineSchedule, Exercises } from "../db.js";
+import { el, clear, loading, toast, showError, confirmAction, emptyState, today, weekdayIndex, WEEKDAYS } from "../utils.js";
 import { actionMenu, dragHandle, kebabButton } from "../ui.js";
 import { makeSortable } from "../dnd.js";
 import { exerciseIcon } from "../exercise-icons.js";
 
 export async function renderRoutine(root) {
   loading(root);
-  const [days, catalog] = await Promise.all([
-    RoutineDays.list({ includeInactive: true }),
+  const program = await RoutinePrograms.active();
+
+  if (!program) {
+    clear(root);
+    root.append(el("h1", { class: "view-title" }, "Rutina"));
+    root.append(emptyState("No hay ningún programa activo", "Crea o activa uno en Programas."));
+    root.append(el("a", { class: "btn btn--primary", href: "#/programs" }, "🗂  Programas"));
+    return;
+  }
+
+  const [days, schedule, catalog] = await Promise.all([
+    RoutineDays.list({ programId: program.id, includeInactive: true }),
+    RoutineSchedule.byProgram(program.id),
     Exercises.list(),
   ]);
   const perDay = await Promise.all(days.map((d) => RoutineExercises.byDay(d.id)));
 
   clear(root);
   root.append(el("h1", { class: "view-title" }, "Rutina"));
+
+  // ---- Calendario semanal del programa activo -------------------------------
+  root.append(weekCard(program, schedule, days, root));
 
   // ---- Añadir día ---------------------------------------------------------
   const addDay = el("div", { class: "card" });
@@ -31,7 +47,7 @@ export async function renderRoutine(root) {
     if (!nameInput.value.trim()) return;
     try {
       const order = days.length ? Math.max(...days.map((d) => d.day_order || 0)) + 1 : 1;
-      await RoutineDays.insert({ name: nameInput.value.trim(), day_order: order });
+      await RoutineDays.insert({ name: nameInput.value.trim(), day_order: order, program_id: program.id });
       toast("Día añadido");
       renderRoutine(root);
     } catch (err) { showError(err); }
@@ -40,7 +56,8 @@ export async function renderRoutine(root) {
   root.append(addDay);
 
   if (!days.length) {
-    root.append(emptyState("Aún no hay días de rutina", "Crea tu primer día arriba (Push / Pull / Legs...)."));
+    root.append(emptyState("Este programa aún no tiene días", "Crea el primero arriba (Push / Pull / Legs...)."));
+    root.append(el("a", { class: "btn btn--ghost field--wide", href: "#/programs" }, "🗂  Programas"));
     return;
   }
 
@@ -54,7 +71,9 @@ export async function renderRoutine(root) {
   days.forEach((day, i) => daysHost.append(dayCard(day, perDay[i], days, catalog, root)));
   root.append(daysHost);
 
-  // Acceso al catálogo de ejercicios (ya no está en la barra inferior)
+  // Accesos secundarios (fuera de la barra inferior)
+  root.append(el("a", { class: "btn btn--ghost field--wide", href: "#/programs" },
+    "🗂  Programas"));
   root.append(el("a", { class: "btn btn--ghost field--wide", href: "#/exercises" },
     "📋  Catálogo de ejercicios"));
   makeSortable(daysHost, {
@@ -65,6 +84,62 @@ export async function renderRoutine(root) {
       } catch (e) { showError(e); renderRoutine(root); }
     },
   });
+}
+
+// ---------------------------------------------------------------------------
+// Calendario semanal: 7 filas (lunes-domingo) con la fuerza asignada y la nota
+// de cardio. Tocar una fila abre el menú para cambiar la fuerza o la nota.
+function weekCard(program, schedule, days, root) {
+  const card = el("div", { class: "card" });
+  card.append(el("h2", { class: "card__title" }, `📅 Semana · ${program.name}`));
+
+  const todayIdx = weekdayIndex(today());
+  const bySlot = new Map(schedule.map((s) => [s.weekday, s]));
+
+  for (let wd = 0; wd < 7; wd++) {
+    const slot = bySlot.get(wd) || null;
+    const strength = slot?.day?.name || null;
+
+    const row = el("div", {
+      class: "list-row list-row--tap" + (wd === todayIdx ? " week-row--today" : ""),
+    }, [
+      el("div", { class: "week-row__day" }, WEEKDAYS[wd] + (wd === todayIdx ? " · hoy" : "")),
+      el("div", { class: "list-row__main" }, [
+        el("div", { class: "list-row__title" + (strength ? "" : " muted") }, strength || "Descanso"),
+        slot?.note ? el("div", { class: "list-row__sub" }, slot.note) : null,
+      ]),
+    ]);
+
+    row.addEventListener("click", () => actionMenu(row, [
+      ...days.map((d) => ({
+        icon: "🏋", label: d.name,
+        onClick: async () => {
+          try { await RoutineSchedule.set(program.id, wd, { routine_day_id: d.id, note: slot?.note ?? null }); renderRoutine(root); }
+          catch (e) { showError(e); }
+        },
+      })),
+      {
+        icon: "😴", label: "Sin fuerza (descanso)",
+        onClick: async () => {
+          try { await RoutineSchedule.set(program.id, wd, { routine_day_id: null, note: slot?.note ?? null }); renderRoutine(root); }
+          catch (e) { showError(e); }
+        },
+      },
+      {
+        icon: "✎", label: "Nota de cardio…",
+        onClick: async () => {
+          const note = prompt("Nota del día (cardio, descanso...)", slot?.note ?? "");
+          if (note == null) return;
+          try { await RoutineSchedule.set(program.id, wd, { routine_day_id: slot?.routine_day_id ?? null, note: note.trim() || null }); renderRoutine(root); }
+          catch (e) { showError(e); }
+        },
+      },
+    ], { title: WEEKDAYS[wd] }));
+
+    card.append(row);
+  }
+
+  return card;
 }
 
 // ---------------------------------------------------------------------------
