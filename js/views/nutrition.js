@@ -90,6 +90,11 @@ function fmtG(n) {
   return (n ?? 0).toLocaleString("es-ES", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 }
 
+// Cantidad total (g/ml/ud): sin decimales de relleno (60 g, 2,5 ud).
+function fmtAmt(n) {
+  return (n ?? 0).toLocaleString("es-ES", { maximumFractionDigits: 1 });
+}
+
 function dietPlanCard(slots, items, foods, root) {
   const card = el("div", { class: "card" });
   card.append(el("h2", { class: "card__title" }, "🍽 Tu dieta"));
@@ -110,6 +115,24 @@ function dietPlanCard(slots, items, foods, root) {
       el("span", { class: "ledger-chip" }, [el("span", { class: "ledger-dot ledger-dot--f" }), "Grasa ", grandF]),
     ]),
   ]));
+
+  // Columnas de macros colapsadas por defecto; el botón las despliega y la
+  // preferencia se recuerda entre sesiones (localStorage).
+  const MACROS_KEY = "ft_ledger_macros";
+  let macrosVisible = localStorage.getItem(MACROS_KEY) === "1";
+  card.classList.toggle("ledger-lite", !macrosVisible);
+  const macroBtn = el("button", { type: "button", class: "ledger-macros-btn" });
+  const syncMacroBtn = () => {
+    macroBtn.textContent = macrosVisible ? "▾ Ocultar valores nutricionales" : "▸ Ver valores nutricionales";
+  };
+  macroBtn.addEventListener("click", () => {
+    macrosVisible = !macrosVisible;
+    localStorage.setItem(MACROS_KEY, macrosVisible ? "1" : "0");
+    card.classList.toggle("ledger-lite", !macrosVisible);
+    syncMacroBtn();
+  });
+  syncMacroBtn();
+  card.append(macroBtn);
 
   const sections = []; // { total:{p,h,g,kcal}, active, rows }
 
@@ -143,6 +166,7 @@ function dietPlanCard(slots, items, foods, root) {
         const n = isNaN(q) || q < 0 ? 0 : q;
         const f = r.item.food;
         const rp = (f.protein || 0) * n, rh = (f.carbs || 0) * n, rg = (f.fat || 0) * n, rk = (f.kcal || 0) * n;
+        r.outAmt.textContent = `${fmtAmt((f.amount || 0) * n)} ${f.unit || ""}`;
         r.outP.textContent = fmtG(rp); r.outH.textContent = fmtG(rh); r.outG.textContent = fmtG(rg); r.outK.textContent = String(Math.round(rk));
         p += rp; h += rh; g += rg; kcal += rk;
       }
@@ -155,18 +179,20 @@ function dietPlanCard(slots, items, foods, root) {
     function addRow(item) {
       const f = item.food;
       const qty = el("input", { type: "number", class: "ledger-qty", value: String(item.qty ?? 1), step: "0.25", min: "0" });
-      const outP = el("td", { class: "num" }, "0.0");
-      const outH = el("td", { class: "num" }, "0.0");
-      const outG = el("td", { class: "num" }, "0.0");
-      const outK = el("td", { class: "num" }, "0");
+      const outAmt = el("td", { class: "num ledger-amt" }, "");
+      const outP = el("td", { class: "num col-nutri" }, "0.0");
+      const outH = el("td", { class: "num col-nutri" }, "0.0");
+      const outG = el("td", { class: "num col-nutri" }, "0.0");
+      const outK = el("td", { class: "num col-nutri" }, "0");
       const delBtn = el("button", { type: "button", class: "ledger-del", title: `Quitar ${f.name}` }, "✕");
       const tr = el("tr", {}, [
         el("td", {}, [f.name, el("div", { class: "ledger-ref" }, `ración base: ${fmt(f.amount, f.amount < 10 ? 2 : 0)} ${f.unit}`)]),
         el("td", { class: "num" }, qty),
+        outAmt,
         outP, outH, outG, outK,
         el("td", { class: "num" }, delBtn),
       ]);
-      const row = { item, qty, outP, outH, outG, outK };
+      const row = { item, qty, outAmt, outP, outH, outG, outK };
       rows.push(row);
       tbody.append(tr);
       qty.addEventListener("input", recalcSection);
@@ -182,10 +208,19 @@ function dietPlanCard(slots, items, foods, root) {
     slotItems.forEach(addRow);
 
     const table = el("table", { class: "table ledger-table" }, [
-      el("thead", {}, el("tr", {}, ["Ingrediente", "Cant.(×)", "Prot.", "Carb.", "Grasa", "Kcal", ""].map((h) => el("th", {}, h)))),
+      el("thead", {}, el("tr", {}, [
+        el("th", {}, "Ingrediente"),
+        el("th", {}, "Cant.(×)"),
+        el("th", { class: "num" }, "Total"),
+        el("th", { class: "col-nutri" }, "Prot."),
+        el("th", { class: "col-nutri" }, "Carb."),
+        el("th", { class: "col-nutri" }, "Grasa"),
+        el("th", { class: "col-nutri" }, "Kcal"),
+        el("th", {}, ""),
+      ])),
       tbody,
       el("tfoot", {}, el("tr", { class: "ledger-subtotal" }, [
-        el("td", {}, "Subtotal"), el("td", {}), subP, subH, subG, subK, el("td", {}),
+        el("td", {}, "Subtotal"), el("td", {}), el("td", {}), subP, subH, subG, subK, el("td", {}),
       ])),
     ]);
 

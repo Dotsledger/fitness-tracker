@@ -620,6 +620,22 @@ input[type="checkbox"] { width: 24px; height: 24px; min-height: 0; accent-color:
 
 .ledger-add { margin-top: 8px; }
 .ledger-add select { flex: 1 1 auto; min-width: 0; }
+
+/* Macros del cuaderno colapsables: en modo "lite" se ocultan las columnas
+   nutricionales y el subtotal; queda ingrediente + cantidad + total (g/ml/ud). */
+.ledger-macros-btn {
+  background: none;
+  border: none;
+  color: var(--primary);
+  font-size: 0.88rem;
+  font-weight: 600;
+  padding: 4px 0 10px;
+  min-height: 0;
+  cursor: pointer;
+}
+.ledger-lite .col-nutri { display: none; }
+.ledger-lite .ledger-table tfoot { display: none; }
+.ledger-amt { white-space: nowrap; color: var(--text-dim); }
 .ledger-table .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .ledger-ref { font-size: 0.72rem; color: var(--muted); margin-top: 2px; }
 .ledger-table input.ledger-qty {
