@@ -7,6 +7,7 @@
 // ============================================================================
 
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./config.js";
+import { getActiveProfileId } from "./active-profile.js";
 
 if (!window.supabase || typeof window.supabase.createClient !== "function") {
   throw new Error("Supabase JS no se ha cargado (revisa el <script> del CDN en index.html).");
@@ -26,40 +27,58 @@ async function run(promise) {
   return data;
 }
 
-// ---- Profile (fila única) --------------------------------------------------
+// Id del perfil activo. Todas las consultas por-persona pasan por aquí: si
+// falta, es un error de arranque y preferimos fallar antes que devolver (o
+// escribir) los datos del otro perfil.
+function pid() {
+  const id = getActiveProfileId();
+  if (!id) throw new Error("No hay perfil activo seleccionado.");
+  return id;
+}
+
+// ---- Profile (una fila por persona) ----------------------------------------
 export const Profile = {
+  // SIN filtrar: es la que alimenta el selector de perfil. El orden importa:
+  // el primero es el que se elige cuando el navegador no tiene ninguno guardado.
+  list() {
+    return run(
+      sb.from("profile").select("*")
+        .order("sort_order", { ascending: true })
+        .order("name", { ascending: true })
+    );
+  },
   async get() {
-    const rows = await run(sb.from("profile").select("*").limit(1));
+    const rows = await run(sb.from("profile").select("*").eq("id", pid()).limit(1));
     return rows[0] || null;
   },
   async update(id, patch) {
     patch.updated_at = new Date().toISOString();
     return run(sb.from("profile").update(patch).eq("id", id).select().single());
   },
-  async create(patch) {
-    return run(sb.from("profile").insert(patch).select().single());
+  insert(row) {
+    return run(sb.from("profile").insert(row).select().single());
   },
 };
 
 // ---- Body metrics ----------------------------------------------------------
 export const BodyMetrics = {
   latest() {
-    return run(sb.from("body_metrics").select("*").order("measured_at", { ascending: false }).limit(1))
-      .then((r) => r[0] || null);
+    return run(
+      sb.from("body_metrics").select("*").eq("profile_id", pid())
+        .order("measured_at", { ascending: false }).limit(1)
+    ).then((r) => r[0] || null);
   },
   // Las N mediciones más RECIENTES, devueltas en orden ascendente (para gráficas).
   list(limit = 500) {
-    return run(sb.from("body_metrics").select("*").order("measured_at", { ascending: false }).limit(limit))
-      .then((rows) => rows.reverse());
+    return run(
+      sb.from("body_metrics").select("*").eq("profile_id", pid())
+        .order("measured_at", { ascending: false }).limit(limit)
+    ).then((rows) => rows.reverse());
   },
-  insert(row) {
-    return run(sb.from("body_metrics").insert(row).select().single());
-  },
+  // Sella el perfil aquí para que ningún llamador (importador de CSV) lo olvide.
   insertMany(rows) {
-    return run(sb.from("body_metrics").insert(rows).select());
-  },
-  update(id, patch) {
-    return run(sb.from("body_metrics").update(patch).eq("id", id).select().single());
+    const owned = rows.map((r) => ({ ...r, profile_id: pid() }));
+    return run(sb.from("body_metrics").insert(owned).select());
   },
   remove(id) {
     return run(sb.from("body_metrics").delete().eq("id", id));
@@ -84,17 +103,22 @@ export const Exercises = {
   },
 };
 
-// ---- Programas de rutina (bloques de entrenamiento, uno activo a la vez) ----
+// ---- Programas de rutina (bloques de entrenamiento, uno activo por perfil) ---
 export const RoutinePrograms = {
   list() {
-    return run(sb.from("routine_programs").select("*").order("created_at", { ascending: true }));
+    return run(
+      sb.from("routine_programs").select("*").eq("profile_id", pid())
+        .order("created_at", { ascending: true })
+    );
   },
   async active() {
-    const rows = await run(sb.from("routine_programs").select("*").eq("is_active", true).limit(1));
+    const rows = await run(
+      sb.from("routine_programs").select("*").eq("profile_id", pid()).eq("is_active", true).limit(1)
+    );
     return rows[0] || null;
   },
   insert(row) {
-    return run(sb.from("routine_programs").insert(row).select().single());
+    return run(sb.from("routine_programs").insert({ ...row, profile_id: pid() }).select().single());
   },
   update(id, patch) {
     return run(sb.from("routine_programs").update(patch).eq("id", id).select().single());
@@ -102,10 +126,14 @@ export const RoutinePrograms = {
   remove(id) {
     return run(sb.from("routine_programs").delete().eq("id", id));
   },
-  // Activa un programa desactivando el resto (2 llamadas, sin transacción:
-  // aceptable en app monousuario; el peor caso es 0 activos, no 2).
+  // Activa un programa desactivando los demás DEL MISMO PERFIL (2 llamadas, sin
+  // transacción: el peor caso es 0 activos, no 2 — además la BD lo garantiza con
+  // el índice único parcial uq_active_program_per_profile).
   async activate(id) {
-    await run(sb.from("routine_programs").update({ is_active: false }).neq("id", id).select());
+    await run(
+      sb.from("routine_programs").update({ is_active: false })
+        .eq("profile_id", pid()).neq("id", id).select()
+    );
     return run(sb.from("routine_programs").update({ is_active: true }).eq("id", id).select().single());
   },
 };
@@ -134,11 +162,15 @@ export const RoutineSchedule = {
 };
 
 // ---- Routine days ----------------------------------------------------------
+// Heredan el perfil a través de program_id, así que hay que acotar SIEMPRE por
+// programa(s): sin acotar devolvemos [] en vez de los días de los dos perfiles.
 export const RoutineDays = {
-  list({ includeInactive = false, programId = null } = {}) {
-    let q = sb.from("routine_days").select("*").order("day_order", { ascending: true });
+  list({ includeInactive = false, programId = null, programIds = null } = {}) {
+    const ids = programIds ?? (programId ? [programId] : []);
+    if (!ids.length) return Promise.resolve([]);
+    let q = sb.from("routine_days").select("*").in("program_id", ids)
+      .order("day_order", { ascending: true });
     if (!includeInactive) q = q.eq("is_active", true);
-    if (programId) q = q.eq("program_id", programId);
     return run(q);
   },
   insert(row) {
@@ -193,15 +225,26 @@ export const Foods = {
 
 export const MealSlots = {
   list() {
-    return run(sb.from("meal_slots").select("*").order("slot_order", { ascending: true }));
+    return run(
+      sb.from("meal_slots").select("*").eq("profile_id", pid())
+        .order("slot_order", { ascending: true })
+    );
+  },
+  // Usado al crear un perfil nuevo para sembrarle sus comidas base.
+  insertMany(rows) {
+    const owned = rows.map((r) => ({ ...r, profile_id: pid() }));
+    return run(sb.from("meal_slots").insert(owned).select());
   },
 };
 
 export const MealItems = {
-  list() {
+  // Acotado a las comidas del perfil (el llamador pasa los ids de sus slots).
+  list(slotIds) {
+    if (!slotIds?.length) return Promise.resolve([]);
     return run(
       sb.from("meal_items")
         .select("*, food:foods(*)")
+        .in("meal_slot_id", slotIds)
         .order("item_order", { ascending: true })
     );
   },
@@ -225,6 +268,7 @@ export const WorkoutSessions = {
     return run(
       sb.from("workout_sessions")
         .select("*, routine_day:routine_days(name)")
+        .eq("profile_id", pid())
         .order("session_date", { ascending: false })
         .limit(limit)
     );
@@ -235,7 +279,7 @@ export const WorkoutSessions = {
     );
   },
   insert(row) {
-    return run(sb.from("workout_sessions").insert(row).select().single());
+    return run(sb.from("workout_sessions").insert({ ...row, profile_id: pid() }).select().single());
   },
   update(id, patch) {
     return run(sb.from("workout_sessions").update(patch).eq("id", id).select().single());
@@ -252,18 +296,6 @@ export const WorkoutSessions = {
     );
     return rows.length > 0;
   },
-  // Nº de sesiones en los últimos `days` días (para la racha del dashboard).
-  async recent(days = 30) {
-    const since = new Date();
-    since.setDate(since.getDate() - days);
-    const iso = since.toISOString().slice(0, 10);
-    return run(
-      sb.from("workout_sessions")
-        .select("session_date")
-        .gte("session_date", iso)
-        .order("session_date", { ascending: false })
-    );
-  },
 };
 
 // ---- Workout sets ----------------------------------------------------------
@@ -277,11 +309,14 @@ export const WorkoutSets = {
         .order("set_number")
     );
   },
+  // profile_id se sella aquí (es NOT NULL en la BD): las series se consultan
+  // por exercise_id, que es catálogo COMPARTIDO, así que no basta con la sesión.
   insert(row) {
-    return run(sb.from("workout_sets").insert(row).select().single());
+    return run(sb.from("workout_sets").insert({ ...row, profile_id: pid() }).select().single());
   },
   insertMany(rows) {
-    return run(sb.from("workout_sets").insert(rows).select());
+    const owned = rows.map((r) => ({ ...r, profile_id: pid() }));
+    return run(sb.from("workout_sets").insert(owned).select());
   },
   update(id, patch) {
     return run(sb.from("workout_sets").update(patch).eq("id", id).select().single());
@@ -294,27 +329,11 @@ export const WorkoutSets = {
     return run(
       sb.from("workout_sets")
         .select("*, session:workout_sessions(session_date)")
+        .eq("profile_id", pid())
         .eq("exercise_id", exerciseId)
         .order("created_at", { ascending: true })
         .limit(limit)
     );
-  },
-  // La última sesión en la que se hizo este ejercicio, con sus series.
-  async lastSetsFor(exerciseId, excludeSessionId = null) {
-    let q = sb.from("workout_sets")
-      .select("*, session:workout_sessions(id, session_date)")
-      .eq("exercise_id", exerciseId)
-      .order("created_at", { ascending: false })
-      .limit(50);
-    const rows = await run(q);
-    const filtered = excludeSessionId
-      ? rows.filter((r) => r.session && r.session.id !== excludeSessionId)
-      : rows;
-    if (!filtered.length) return [];
-    const lastSessionId = filtered[0].session?.id;
-    return filtered
-      .filter((r) => r.session?.id === lastSessionId)
-      .sort((a, b) => a.set_number - b.set_number);
   },
   // Historial agrupado por sesión (más reciente primero), excluyendo la sesión
   // actual. Devuelve [{ sessionId, date, sets:[...] }].
@@ -322,6 +341,7 @@ export const WorkoutSets = {
     const rows = await run(
       sb.from("workout_sets")
         .select("*, session:workout_sessions(id, session_date)")
+        .eq("profile_id", pid())
         .eq("exercise_id", exerciseId)
         .order("created_at", { ascending: false })
         .limit(120)

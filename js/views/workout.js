@@ -103,12 +103,19 @@ const RestTimer = (() => {
 export async function renderWorkout(root) {
   loading(root);
   const program = await RoutinePrograms.active();
-  const [days, schedule] = await Promise.all([
-    RoutineDays.list(program ? { programId: program.id } : {}),
-    program ? RoutineSchedule.byProgram(program.id) : Promise.resolve([]),
-  ]);
   clear(root);
   root.append(el("h1", { class: "view-title" }, "Registrar entreno"));
+
+  if (!program) {
+    root.append(emptyState("No hay ningún programa activo", "Activa o crea uno en Programas."));
+    root.append(el("a", { class: "btn btn--primary", href: "#/programs" }, "🗂  Programas"));
+    return;
+  }
+
+  const [days, schedule] = await Promise.all([
+    RoutineDays.list({ programId: program.id }),
+    RoutineSchedule.byProgram(program.id),
+  ]);
 
   if (!days.length) {
     root.append(emptyState("No hay días de rutina activos", "Crea uno en la sección Rutina."));

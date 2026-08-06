@@ -11,13 +11,14 @@ import { CHART_COLORS } from "../charts.js";
 
 export async function renderNutrition(root) {
   loading(root);
-  const [profile, metrics, slots, items, foods] = await Promise.all([
+  const [profile, metrics, slots, foods] = await Promise.all([
     Profile.get(),
     BodyMetrics.latest().then((m) => (m ? [m] : [])).catch(() => []),
     MealSlots.list().catch(() => []),
-    MealItems.list().catch(() => []),
     Foods.list().catch(() => []),
   ]);
+  // Los items van después: se piden solo los de las comidas de este perfil.
+  const items = await MealItems.list(slots.map((s) => s.id)).catch(() => []);
   const latest = metrics.length ? metrics[0] : null;
   const macros = computeMacros(profile, latest);
 

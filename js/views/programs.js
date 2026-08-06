@@ -11,10 +11,13 @@ import { actionMenu, kebabButton } from "../ui.js";
 
 export async function renderPrograms(root) {
   loading(root);
-  const [programs, allDays] = await Promise.all([
-    RoutinePrograms.list(),
-    RoutineDays.list({ includeInactive: true }),
-  ]);
+  // Los días se acotan a los programas de este perfil (RoutineDays no sabe de
+  // perfiles: hereda la separación a través de program_id).
+  const programs = await RoutinePrograms.list();
+  const allDays = await RoutineDays.list({
+    programIds: programs.map((p) => p.id),
+    includeInactive: true,
+  });
 
   clear(root);
   root.append(el("a", { class: "back-link", href: "#/routine" }, "← Rutina"));

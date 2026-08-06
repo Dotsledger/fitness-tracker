@@ -5,19 +5,28 @@
 -- Es idempotente en lo razonable: usa "if not exists" / "drop policy if exists"
 -- donde tiene sentido, para que puedas re-ejecutarlo sin romper nada.
 --
--- Decisión consciente: la app es de un solo usuario y NO tiene login. El
--- frontend usa la clave "anon". Aun así activamos RLS con políticas EXPLÍCITAS
--- (no dejamos las tablas abiertas por defecto). Ver bloque de políticas abajo.
+-- Decisión consciente: la app NO tiene login. El frontend usa la clave "anon".
+-- Aun así activamos RLS con políticas EXPLÍCITAS (no dejamos las tablas
+-- abiertas por defecto). Ver bloque de políticas abajo.
+--
+-- MULTIPERFIL (2026-08): la usan varias personas desde la misma URL, con un
+-- selector de perfil en la cabecera. `profile` tiene una fila por persona y las
+-- tablas por-persona llevan `profile_id`. `foods` y `exercises` son CATÁLOGOS
+-- COMPARTIDOS a propósito. Sin login no hay auth.uid(), así que la separación
+-- la aplica la capa de datos (js/db.js filtra por el perfil activo) — la BD solo
+-- pone las redes de seguridad: NOT NULL en profile_id e índices.
 -- ============================================================================
 
 -- Extensión para gen_random_uuid()
 create extension if not exists "pgcrypto";
 
 -- ----------------------------------------------------------------------------
--- Perfil (fila única)
+-- Perfiles (una fila por persona; raíz de todos los datos por-persona)
 -- ----------------------------------------------------------------------------
 create table if not exists profile (
   id uuid primary key default gen_random_uuid(),
+  name text not null,                          -- etiqueta del selector de perfil
+  sort_order int default 100,                  -- orden en el selector; el 1º es el que sale por defecto
   sex text check (sex in ('male','female')) default 'male',
   birth_date date,
   height_cm numeric,
@@ -38,6 +47,7 @@ create table if not exists profile (
 -- ----------------------------------------------------------------------------
 create table if not exists body_metrics (
   id uuid primary key default gen_random_uuid(),
+  profile_id uuid not null references profile(id) on delete cascade,
   measured_at date not null default current_date,
   weight_kg numeric not null,
   body_fat_pct numeric,
@@ -51,9 +61,10 @@ create table if not exists body_metrics (
   created_at timestamptz default now()
 );
 create index if not exists idx_body_metrics_measured_at on body_metrics (measured_at desc);
+create index if not exists idx_body_metrics_profile on body_metrics (profile_id, measured_at desc);
 
 -- ----------------------------------------------------------------------------
--- Catálogo de ejercicios
+-- Catálogo de ejercicios · COMPARTIDO entre perfiles (sin profile_id)
 -- ----------------------------------------------------------------------------
 create table if not exists exercises (
   id uuid primary key default gen_random_uuid(),
@@ -66,18 +77,22 @@ create table if not exists exercises (
 );
 
 -- ----------------------------------------------------------------------------
--- Programas de rutina (bloques de entrenamiento; solo uno activo a la vez,
--- lo garantiza la app al activar — no hay trigger)
+-- Programas de rutina (bloques de entrenamiento). Uno activo POR PERFIL: lo
+-- garantiza el índice único parcial de abajo, no solo la app.
 -- ----------------------------------------------------------------------------
 create table if not exists routine_programs (
   id uuid primary key default gen_random_uuid(),
+  profile_id uuid not null references profile(id) on delete cascade,
   name text not null,
   is_active boolean default false,
   created_at timestamptz default now()
 );
+create unique index if not exists uq_active_program_per_profile
+  on routine_programs (profile_id) where is_active;
 
 -- ----------------------------------------------------------------------------
--- Días de rutina (ej. Push / Pull / Legs) — cada día pertenece a un programa
+-- Días de rutina (ej. Push / Pull / Legs) — cada día pertenece a un programa,
+-- y hereda el perfil a través de él (sin profile_id propio)
 -- ----------------------------------------------------------------------------
 create table if not exists routine_days (
   id uuid primary key default gen_random_uuid(),
@@ -120,18 +135,24 @@ create index if not exists idx_routine_exercises_day on routine_exercises (routi
 -- ----------------------------------------------------------------------------
 create table if not exists workout_sessions (
   id uuid primary key default gen_random_uuid(),
+  profile_id uuid not null references profile(id) on delete cascade,
   session_date date not null default current_date,
   routine_day_id uuid references routine_days(id),
   notes text,
   created_at timestamptz default now()
 );
 create index if not exists idx_workout_sessions_date on workout_sessions (session_date desc);
+create index if not exists idx_workout_sessions_profile on workout_sessions (profile_id, session_date desc);
 
 -- ----------------------------------------------------------------------------
--- Series concretas registradas en cada sesión
+-- Series concretas registradas en cada sesión.
+-- profile_id va DESNORMALIZADO aquí (además de venir por session_id) porque el
+-- historial de un ejercicio se consulta por exercise_id, y el catálogo de
+-- ejercicios es compartido: sin esta columna se mezclarían las series de ambos.
 -- ----------------------------------------------------------------------------
 create table if not exists workout_sets (
   id uuid primary key default gen_random_uuid(),
+  profile_id uuid not null references profile(id) on delete cascade,
   session_id uuid references workout_sessions(id) on delete cascade,
   exercise_id uuid references exercises(id),
   set_number int not null,
@@ -144,12 +165,14 @@ create table if not exists workout_sets (
 );
 create index if not exists idx_workout_sets_session on workout_sets (session_id);
 create index if not exists idx_workout_sets_exercise on workout_sets (exercise_id);
+create index if not exists idx_workout_sets_profile_ex on workout_sets (profile_id, exercise_id, created_at desc);
 
 -- ----------------------------------------------------------------------------
 -- Cuaderno nutricional: biblioteca de alimentos + comidas componibles.
--- foods = catálogo editable desde la app (/foods). meal_slots = las 4 comidas
--- del día (menú fijo, igual todos los días). meal_items = qué alimentos lleva
--- cada comida y en qué cantidad (× ración base del alimento).
+-- foods = catálogo editable desde la app (/foods), COMPARTIDO entre perfiles.
+-- meal_slots = las comidas del día de CADA perfil (menú fijo, igual todos los
+-- días). meal_items = qué alimentos lleva cada comida y en qué cantidad
+-- (× ración base del alimento); hereda el perfil vía meal_slot_id.
 -- ----------------------------------------------------------------------------
 create table if not exists foods (
   id uuid primary key default gen_random_uuid(),
@@ -166,10 +189,12 @@ create table if not exists foods (
 
 create table if not exists meal_slots (
   id uuid primary key default gen_random_uuid(),
+  profile_id uuid not null references profile(id) on delete cascade,
   slot_order int not null,
   name text not null,          -- "Desayuno (post-entreno ~8:30)"
   optional boolean default false  -- merienda: excluida del total por defecto
 );
+create index if not exists idx_meal_slots_profile on meal_slots (profile_id, slot_order);
 
 create table if not exists meal_items (
   id uuid primary key default gen_random_uuid(),
@@ -225,15 +250,18 @@ end $$;
 -- ============================================================================
 -- Semilla mínima
 -- ============================================================================
--- Crea la fila única de profile solo si aún no existe ninguna.
-insert into profile (goal, calorie_adjustment_pct, protein_g_per_kg, fat_g_per_kg, activity_level)
-select 'recomp', -15, 2.2, 0.8, 'moderate'
+-- Primer perfil + sus comidas base, solo si la tabla está vacía (en una BD ya
+-- en uso esto no hace nada: los perfiles se crean desde el selector de la app,
+-- que también siembra las 4 comidas).
+insert into profile (name, goal, calorie_adjustment_pct, protein_g_per_kg, fat_g_per_kg, activity_level)
+select 'Yo', 'recomp', -15, 2.2, 0.8, 'moderate'
 where not exists (select 1 from profile);
 
--- (Opcional) unos días de rutina vacíos para empezar. Descomenta si quieres.
--- insert into routine_days (name, day_order) values
---   ('Push', 1), ('Pull', 2), ('Legs', 3)
--- on conflict do nothing;
+insert into meal_slots (profile_id, slot_order, name, optional)
+select p.id, v.ord, v.nombre, false
+from profile p
+cross join (values (1, 'Desayuno'), (2, 'Comida'), (3, 'Merienda'), (4, 'Cena')) as v(ord, nombre)
+where not exists (select 1 from meal_slots ms where ms.profile_id = p.id);
 
 -- ============================================================================
 -- Fin del esquema

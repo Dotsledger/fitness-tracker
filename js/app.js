@@ -2,9 +2,13 @@
 // Bootstrap de la app · navegación + rutas + service worker
 // ============================================================================
 
-import { CONFIGURED } from "./db.js";
-import { defineRoute, setOutlet, setNotFound, startRouter } from "./router.js";
-import { el } from "./utils.js";
+import { CONFIGURED, Profile, MealSlots } from "./db.js";
+import { defineRoute, setOutlet, setNotFound, startRouter, navigate, currentPath } from "./router.js";
+import { el, clear, toast, showError } from "./utils.js";
+import { actionMenu } from "./ui.js";
+import {
+  getActiveProfile, getActiveProfileId, getProfiles, resolveActive, setActiveProfileId,
+} from "./active-profile.js";
 
 import { renderRoutine } from "./views/routine.js";
 import { renderWorkout } from "./views/workout.js";
@@ -34,7 +38,107 @@ function buildChrome() {
   document.body.append(nav);
 }
 
-function boot() {
+// ---------------------------------------------------------------------------
+// Selector de perfil · la app la usan varias personas desde la misma URL, sin
+// login. Cambiar de perfil solo cambia el id que db.js usa para filtrar, así
+// que basta con re-renderizar la vista actual.
+// ---------------------------------------------------------------------------
+const DEFAULT_SLOTS = [
+  { slot_order: 1, name: "Desayuno", optional: false },
+  { slot_order: 2, name: "Comida", optional: false },
+  { slot_order: 3, name: "Merienda", optional: false },
+  { slot_order: 4, name: "Cena", optional: false },
+];
+
+function renderProfileSwitcher() {
+  const host = document.querySelector(".topbar__inner");
+  if (!host) return;
+  host.querySelector(".topbar__profile")?.remove();
+
+  const active = getActiveProfile();
+  const btn = el("button", {
+    class: "topbar__profile", type: "button", title: "Cambiar de perfil",
+  }, `👤 ${active?.name || "—"} ▾`);
+
+  btn.addEventListener("click", () => actionMenu(btn, [
+    ...getProfiles().map((p) => ({
+      icon: p.id === getActiveProfileId() ? "✓" : "　",
+      label: p.name,
+      onClick: () => switchProfile(p.id),
+    })),
+    { icon: "✎", label: "Renombrar perfil", onClick: renameActiveProfile },
+    { icon: "＋", label: "Nuevo perfil", onClick: createProfile },
+  ], { title: "Perfil" }));
+
+  host.append(btn);
+}
+
+function switchProfile(id) {
+  if (id === getActiveProfileId()) return;
+  setActiveProfileId(id);
+  renderProfileSwitcher();
+  navigate(currentPath()); // fuerza re-render de la vista con el nuevo perfil
+  toast(`Perfil: ${getActiveProfile()?.name ?? ""}`);
+}
+
+async function renameActiveProfile() {
+  const active = getActiveProfile();
+  if (!active) return;
+  const name = prompt("Nombre del perfil", active.name);
+  if (name == null || !name.trim()) return;
+  try {
+    await Profile.update(active.id, { name: name.trim() });
+    resolveActive(await Profile.list());
+    renderProfileSwitcher();
+    toast("Perfil renombrado");
+  } catch (err) { showError(err); }
+}
+
+async function createProfile() {
+  const name = prompt("Nombre del nuevo perfil");
+  if (name == null || !name.trim()) return;
+  try {
+    const created = await Profile.insert({ name: name.trim() });
+    resolveActive(await Profile.list());
+    setActiveProfileId(created.id);
+    // Sin comidas base la pestaña Nutrición saldría vacía y sin explicación.
+    await MealSlots.insertMany(DEFAULT_SLOTS);
+    renderProfileSwitcher();
+    navigate(currentPath());
+    toast(`Perfil "${created.name}" creado y activo`);
+  } catch (err) { showError(err); }
+}
+
+// Resuelve el perfil activo antes de arrancar el router: sin él, db.js no
+// puede filtrar nada. Devuelve false si no hay forma de continuar.
+async function initProfiles(outlet) {
+  try {
+    const profiles = await Profile.list();
+    if (!profiles.length) throw new Error("No hay ningún perfil en la base de datos.");
+    resolveActive(profiles);
+    renderProfileSwitcher();
+    return true;
+  } catch (err) {
+    console.error(err);
+    resolveActive([]); // conserva el id guardado si lo había
+    if (getActiveProfileId()) {
+      renderProfileSwitcher();
+      return true;
+    }
+    clear(outlet);
+    outlet.append(el("div", { class: "empty" }, [
+      el("div", { class: "empty__title" }, "No se pudo cargar el perfil"),
+      el("div", { class: "empty__sub" }, err?.message || "Revisa la conexión con Supabase."),
+      el("button", {
+        class: "btn btn--primary", type: "button",
+        on: { click: () => window.location.reload() },
+      }, "Reintentar"),
+    ]));
+    return false;
+  }
+}
+
+async function boot() {
   const app = document.getElementById("app");
 
   const outlet = el("main", { class: "outlet", id: "outlet" });
@@ -67,6 +171,7 @@ function boot() {
   });
 
   buildChrome();
+  if (CONFIGURED && !(await initProfiles(outlet))) return;
   startRouter();
 }
 
