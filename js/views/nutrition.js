@@ -323,16 +323,6 @@ function calculatorCard(profile, latest, root) {
   const proteinInput = el("input", { type: "number", step: "0.1", value: profile.protein_g_per_kg ?? "", inputmode: "decimal" });
   const fatInput = el("input", { type: "number", step: "0.1", value: profile.fat_g_per_kg ?? "", inputmode: "decimal" });
 
-  const goalSel = el("select", {});
-  for (const [val, txt] of Object.entries(LABELS.goal)) {
-    goalSel.append(el("option", { value: val, selected: profile.goal === val }, txt));
-  }
-  const overrideInput = el("input", {
-    type: "number", step: "any", value: profile.manual_calorie_override ?? "",
-    inputmode: "decimal", placeholder: "vacío = automático",
-  });
-  const notesInput = el("input", { type: "text", value: profile.notes || "" });
-
   // ---- Celdas de resultado (se rellenan en recalc) ---------------------------
   const outBmr = el("td", { class: "num" }, "—");
   const outTdeeIni = el("td", { class: "num" }, "—");
@@ -351,12 +341,10 @@ function calculatorCard(profile, latest, root) {
   function recalc() {
     const draft = {
       ...profile,
-      goal: goalSel.value,
       activity_level: activitySel.value,
       calorie_adjustment_pct: Number(pctInput.value) || 0,
       protein_g_per_kg: Number(proteinInput.value) || 0,
       fat_g_per_kg: Number(fatInput.value) || 0,
-      manual_calorie_override: overrideInput.value.trim() === "" ? null : Number(overrideInput.value),
     };
     const m = computeMacros(draft, latest);
     clear(warnBox);
@@ -380,7 +368,7 @@ function calculatorCard(profile, latest, root) {
 
     (m.warnings || []).forEach((w) => warnBox.append(el("p", { class: "warn" }, "⚠ " + w)));
   }
-  [activitySel, pctInput, proteinInput, fatInput, overrideInput].forEach((inp) => {
+  [activitySel, pctInput, proteinInput, fatInput].forEach((inp) => {
     inp.addEventListener("input", recalc);
     inp.addEventListener("change", recalc);
   });
@@ -414,25 +402,15 @@ function calculatorCard(profile, latest, root) {
 
   card.append(warnBox);
 
-  // ---- Objetivo, override manual, notas, guardar -----------------------------
-  card.append(el("div", { class: "form-grid" }, [
-    el("label", { class: "field" }, [el("span", {}, "Objetivo"), goalSel]),
-    el("label", { class: "field" }, [el("span", {}, "Override kcal manual"), overrideInput]),
-    el("label", { class: "field field--wide" }, [el("span", {}, "Notas"), notesInput]),
-  ]));
-
   const saveBtn = el("button", { class: "btn btn--primary field--wide", type: "button" }, "Guardar");
   saveBtn.addEventListener("click", async () => {
     saveBtn.disabled = true;
     try {
       await Profile.update(profile.id, {
-        goal: goalSel.value,
         activity_level: activitySel.value,
         calorie_adjustment_pct: Number(pctInput.value) || 0,
         protein_g_per_kg: Number(proteinInput.value) || 0,
         fat_g_per_kg: Number(fatInput.value) || 0,
-        manual_calorie_override: overrideInput.value.trim() === "" ? null : Number(overrideInput.value),
-        notes: notesInput.value.trim() || null,
       });
       toast("Calculadora guardada");
       renderNutrition(root);
