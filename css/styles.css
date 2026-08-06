@@ -646,7 +646,9 @@ tr.ledger-subtotal td { font-weight: 700; border-top: 2px solid var(--text-dim);
 
 /* ---- Calculadora de macros ---------------------------------------------------- */
 .calc-table { font-size: 0.92rem; margin-bottom: 16px; }
-.calc-table td:first-child { color: var(--text-dim); }
+/* Las etiquetas pueden partir línea: así la columna de valores nunca
+   se sale de la pantalla en móvil (el nowrap global de .table lo impedía). */
+.calc-table td:first-child { color: var(--text-dim); white-space: normal; }
 .calc-table .num { text-align: right; font-variant-numeric: tabular-nums; }
 .calc-table select, .calc-table input[type="number"] {
   min-height: 40px;
@@ -657,6 +659,14 @@ tr.ledger-subtotal td { font-weight: 700; border-top: 2px solid var(--text-dim);
   font-variant-numeric: tabular-nums;
 }
 .calc-table select { text-align: left; min-width: 11rem; }
+/* En pantallas estrechas los controles se encogen para que la columna de
+   valores quepa siempre sin scroll horizontal. */
+@media (max-width: 480px) {
+  .calc-table { font-size: 0.88rem; }
+  .calc-table th, .calc-table td { padding: 8px 5px; }
+  .calc-table select { min-width: 0; max-width: 46vw; }
+  .calc-table input[type="number"] { min-width: 4rem; max-width: 5.5rem; }
+}
 tr.calc-subtotal td { border-top: 1px solid var(--border); font-weight: 600; padding-top: 10px; }
 tr.calc-highlight td {
   font-weight: 800;
