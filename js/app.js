@@ -2,7 +2,7 @@
 // Bootstrap de la app · navegación + rutas + service worker
 // ============================================================================
 
-import { CONFIGURED, Profile, MealSlots } from "./db.js";
+import { CONFIGURED, Profile, Menus, MealSlots, DEFAULT_SLOTS } from "./db.js";
 import { defineRoute, setOutlet, setNotFound, startRouter, navigate, currentPath } from "./router.js";
 import { el, clear, toast, showError } from "./utils.js";
 import { actionMenu } from "./ui.js";
@@ -17,6 +17,7 @@ import { renderNutrition } from "./views/nutrition.js";
 import { renderBody } from "./views/body.js";
 import { renderExercises } from "./views/exercises.js";
 import { renderFoods } from "./views/foods.js";
+import { renderMenus } from "./views/menus.js";
 import { renderPrograms } from "./views/programs.js";
 
 const NAV = [
@@ -43,13 +44,6 @@ function buildChrome() {
 // login. Cambiar de perfil solo cambia el id que db.js usa para filtrar, así
 // que basta con re-renderizar la vista actual.
 // ---------------------------------------------------------------------------
-const DEFAULT_SLOTS = [
-  { slot_order: 1, name: "Desayuno", optional: false },
-  { slot_order: 2, name: "Comida", optional: false },
-  { slot_order: 3, name: "Merienda", optional: false },
-  { slot_order: 4, name: "Cena", optional: false },
-];
-
 function renderProfileSwitcher() {
   const host = document.querySelector(".topbar__inner");
   if (!host) return;
@@ -101,8 +95,9 @@ async function createProfile() {
     const created = await Profile.insert({ name: name.trim() });
     resolveActive(await Profile.list());
     setActiveProfileId(created.id);
-    // Sin comidas base la pestaña Nutrición saldría vacía y sin explicación.
-    await MealSlots.insertMany(DEFAULT_SLOTS);
+    // Sin menú ni comidas base la pestaña Nutrición saldría vacía sin explicación.
+    const menu = await Menus.insert({ name: "Estándar", is_active: true });
+    await MealSlots.insertMany(DEFAULT_SLOTS.map((s) => ({ ...s, menu_id: menu.id })));
     renderProfileSwitcher();
     navigate(currentPath());
     toast(`Perfil "${created.name}" creado y activo`);
@@ -165,6 +160,7 @@ async function boot() {
   defineRoute("/body", guard(renderBody));
   defineRoute("/exercises", guard(renderExercises));
   defineRoute("/foods", guard(renderFoods));
+  defineRoute("/menus", guard(renderMenus));
   defineRoute("/programs", guard(renderPrograms));
   setNotFound((root) => {
     root.innerHTML = `<div class="empty"><div class="empty__title">Página no encontrada</div><a class="btn" href="#/">Ir a Entreno</a></div>`;

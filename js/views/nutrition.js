@@ -3,7 +3,7 @@
 // Las mediciones corporales, histórico y gráficas están en la vista "Cuerpo".
 // ============================================================================
 
-import { Profile, BodyMetrics, Foods, MealSlots, MealItems } from "../db.js";
+import { Profile, BodyMetrics, Foods, Menus, MealSlots, MealItems } from "../db.js";
 import { computeMacros } from "../macros.js";
 import { LABELS } from "../config.js";
 import { el, clear, loading, fmt, toast, showError, ageFrom } from "../utils.js";
@@ -11,13 +11,14 @@ import { CHART_COLORS } from "../charts.js";
 
 export async function renderNutrition(root) {
   loading(root);
-  const [profile, metrics, slots, foods] = await Promise.all([
+  const [profile, metrics, menu, foods] = await Promise.all([
     Profile.get(),
     BodyMetrics.latest().then((m) => (m ? [m] : [])).catch(() => []),
-    MealSlots.list().catch(() => []),
+    Menus.active().catch(() => null),
     Foods.list().catch(() => []),
   ]);
-  // Los items van después: se piden solo los de las comidas de este perfil.
+  // Comidas del menú activo, y después sus items (solo los de esas comidas).
+  const slots = menu ? await MealSlots.list(menu.id).catch(() => []) : [];
   const items = await MealItems.list(slots.map((s) => s.id)).catch(() => []);
   const latest = metrics.length ? metrics[0] : null;
   const macros = computeMacros(profile, latest);
@@ -29,8 +30,14 @@ export async function renderNutrition(root) {
   root.append(macrosCard(macros));
 
   // ---- Cuaderno nutricional --------------------------------------------------
-  if (slots.length) {
-    root.append(dietPlanCard(slots, items, foods, root));
+  if (menu && slots.length) {
+    root.append(dietPlanCard(menu, slots, items, foods, root));
+  } else {
+    const card = el("div", { class: "card" });
+    card.append(el("h2", { class: "card__title" }, "🍽 Tu dieta"));
+    card.append(el("p", { class: "muted" }, "No hay ningún menú activo. Crea o activa uno en Menús."));
+    card.append(el("a", { class: "btn btn--primary", href: "#/menus" }, "📒 Menús"));
+    root.append(card);
   }
 
   // ---- Calculadora de macros -------------------------------------------------
@@ -96,11 +103,11 @@ function fmtAmt(n) {
   return (n ?? 0).toLocaleString("es-ES", { maximumFractionDigits: 1 });
 }
 
-function dietPlanCard(slots, items, foods, root) {
+function dietPlanCard(menu, slots, items, foods, root) {
   const card = el("div", { class: "card" });
   card.append(el("h2", { class: "card__title" }, "🍽 Tu dieta"));
 
-  card.append(el("h3", { class: "sub" }, "Cuaderno nutricional"));
+  card.append(el("h3", { class: "sub" }, `Cuaderno nutricional · ${menu.name}`));
   card.append(el("p", { class: "muted small" },
     "Cambia la cantidad (×1 = ración base), añade o quita alimentos de cada comida, y los totales se recalculan solos."));
 
@@ -287,6 +294,7 @@ function dietPlanCard(slots, items, foods, root) {
   });
   card.append(el("div", { class: "ledger-save" }, [
     saveBtn,
+    el("a", { class: "btn btn--ghost", href: "#/menus" }, "📒 Menús"),
     el("a", { class: "btn btn--ghost", href: "#/foods" }, "🥫 Biblioteca de alimentos"),
   ]));
 

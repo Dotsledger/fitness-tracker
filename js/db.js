@@ -223,14 +223,58 @@ export const Foods = {
   },
 };
 
-export const MealSlots = {
+// ---- Menús de dieta (varios guardados por perfil, uno activo) ---------------
+export const Menus = {
   list() {
     return run(
-      sb.from("meal_slots").select("*").eq("profile_id", pid())
+      sb.from("menus").select("*").eq("profile_id", pid())
+        .order("created_at", { ascending: true })
+    );
+  },
+  async active() {
+    const rows = await run(
+      sb.from("menus").select("*").eq("profile_id", pid()).eq("is_active", true).limit(1)
+    );
+    return rows[0] || null;
+  },
+  insert(row) {
+    return run(sb.from("menus").insert({ ...row, profile_id: pid() }).select().single());
+  },
+  update(id, patch) {
+    return run(sb.from("menus").update(patch).eq("id", id).select().single());
+  },
+  remove(id) {
+    return run(sb.from("menus").delete().eq("id", id));
+  },
+  // Activa un menú desactivando los demás DEL MISMO PERFIL (la BD lo garantiza
+  // además con el índice único parcial uq_active_menu_per_profile).
+  async activate(id) {
+    await run(
+      sb.from("menus").update({ is_active: false })
+        .eq("profile_id", pid()).neq("id", id).select()
+    );
+    return run(sb.from("menus").update({ is_active: true }).eq("id", id).select().single());
+  },
+};
+
+// Comidas base con las que nace todo menú nuevo (también al crear un perfil).
+export const DEFAULT_SLOTS = [
+  { slot_order: 1, name: "Desayuno", optional: false },
+  { slot_order: 2, name: "Comida", optional: false },
+  { slot_order: 3, name: "Merienda", optional: false },
+  { slot_order: 4, name: "Cena", optional: false },
+];
+
+export const MealSlots = {
+  // Comidas del menú indicado (el perfil se mantiene como red de seguridad).
+  list(menuId) {
+    if (!menuId) return Promise.resolve([]);
+    return run(
+      sb.from("meal_slots").select("*").eq("profile_id", pid()).eq("menu_id", menuId)
         .order("slot_order", { ascending: true })
     );
   },
-  // Usado al crear un perfil nuevo para sembrarle sus comidas base.
+  // Siembra de comidas para un menú nuevo: cada fila debe traer su menu_id.
   insertMany(rows) {
     const owned = rows.map((r) => ({ ...r, profile_id: pid() }));
     return run(sb.from("meal_slots").insert(owned).select());

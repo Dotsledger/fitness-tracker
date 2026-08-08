@@ -187,14 +187,27 @@ create table if not exists foods (
   is_active boolean default true
 );
 
+-- Menús de dieta: varios guardados por perfil (ej. "Estándar", "Comida fuera"),
+-- uno activo a la vez. Duplicar un menú copia sus comidas y alimentos.
+create table if not exists menus (
+  id uuid primary key default gen_random_uuid(),
+  profile_id uuid not null references profile(id) on delete cascade,
+  name text not null,
+  is_active boolean default false,
+  created_at timestamptz default now()
+);
+create unique index if not exists uq_active_menu_per_profile on menus (profile_id) where is_active;
+
 create table if not exists meal_slots (
   id uuid primary key default gen_random_uuid(),
   profile_id uuid not null references profile(id) on delete cascade,
+  menu_id uuid not null references menus(id) on delete cascade,
   slot_order int not null,
   name text not null,          -- "Desayuno (post-entreno ~8:30)"
   optional boolean default false  -- merienda: excluida del total por defecto
 );
 create index if not exists idx_meal_slots_profile on meal_slots (profile_id, slot_order);
+create index if not exists idx_meal_slots_menu on meal_slots (menu_id, slot_order);
 
 create table if not exists meal_items (
   id uuid primary key default gen_random_uuid(),
@@ -231,7 +244,8 @@ declare
     'profile','body_metrics','exercises','routine_days',
     'routine_exercises','workout_sessions','workout_sets',
     'foods','meal_slots','meal_items',
-    'routine_programs','routine_schedule'
+    'routine_programs','routine_schedule',
+    'menus'
   ];
 begin
   foreach t in array tables loop
@@ -257,9 +271,15 @@ insert into profile (name, goal, calorie_adjustment_pct, protein_g_per_kg, fat_g
 select 'Yo', 'recomp', -15, 2.2, 0.8, 'moderate'
 where not exists (select 1 from profile);
 
-insert into meal_slots (profile_id, slot_order, name, optional)
-select p.id, v.ord, v.nombre, false
+insert into menus (profile_id, name, is_active)
+select p.id, 'Estándar', true
 from profile p
+where not exists (select 1 from menus m where m.profile_id = p.id);
+
+insert into meal_slots (profile_id, menu_id, slot_order, name, optional)
+select p.id, m.id, v.ord, v.nombre, false
+from profile p
+join menus m on m.profile_id = p.id and m.is_active
 cross join (values (1, 'Desayuno'), (2, 'Comida'), (3, 'Merienda'), (4, 'Cena')) as v(ord, nombre)
 where not exists (select 1 from meal_slots ms where ms.profile_id = p.id);
 

@@ -6,7 +6,7 @@
    Sube CACHE_VERSION al cambiar el shell.
    ========================================================================== */
 
-const CACHE_VERSION = "ft-shell-v32";
+const CACHE_VERSION = "ft-shell-v33";
 
 const SHELL = [
   "./",
@@ -29,6 +29,7 @@ const SHELL = [
   "./js/views/history.js",
   "./js/views/nutrition.js",
   "./js/views/foods.js",
+  "./js/views/menus.js",
   "./js/views/programs.js",
   "./js/views/body.js",
   "./js/tanita-csv.js",
