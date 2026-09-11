@@ -7,6 +7,7 @@ import { defineRoute, setOutlet, setNotFound, startRouter, navigate, currentPath
 import { el, clear, toast, showError } from "./utils.js";
 import { actionMenu } from "./ui.js";
 import { icon } from "./icons.js";
+import { initTheme, toggleTheme, currentTheme } from "./theme.js";
 import {
   getActiveProfile, getActiveProfileId, getProfiles, resolveActive, setActiveProfileId,
 } from "./active-profile.js";
@@ -38,6 +39,30 @@ function buildChrome() {
     ]));
   }
   document.body.append(nav);
+  renderThemeToggle();
+}
+
+// Botón claro/oscuro en la cabecera. Re-renderiza la vista al cambiar para que
+// las gráficas (leen los tokens al pintar) cojan los colores del tema nuevo.
+function renderThemeToggle() {
+  const host = document.querySelector(".topbar__actions");
+  if (!host) return;
+  host.querySelector(".topbar__theme")?.remove();
+  const btn = el("button", { class: "topbar__theme", type: "button" });
+  const sync = () => {
+    const dark = currentTheme() === "dark";
+    btn.replaceChildren(icon(dark ? "sun" : "moon", 18));
+    const label = dark ? "Cambiar a modo claro" : "Cambiar a modo oscuro";
+    btn.setAttribute("aria-label", label);
+    btn.title = label;
+  };
+  btn.addEventListener("click", () => {
+    toggleTheme();
+    sync();
+    if (document.querySelector("#outlet")?.childElementCount) navigate(currentPath());
+  });
+  sync();
+  host.prepend(btn);
 }
 
 // ---------------------------------------------------------------------------
@@ -46,7 +71,7 @@ function buildChrome() {
 // que basta con re-renderizar la vista actual.
 // ---------------------------------------------------------------------------
 function renderProfileSwitcher() {
-  const host = document.querySelector(".topbar__inner");
+  const host = document.querySelector(".topbar__actions");
   if (!host) return;
   host.querySelector(".topbar__profile")?.remove();
 
@@ -140,6 +165,7 @@ async function initProfiles(outlet) {
 }
 
 async function boot() {
+  initTheme();
   const app = document.getElementById("app");
 
   const outlet = el("main", { class: "outlet", id: "outlet" });

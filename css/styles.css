@@ -59,8 +59,9 @@
   color-scheme: dark;
 }
 
-@media (prefers-color-scheme: light) {
-  :root {
+/* El tema lo fija <html data-theme> (inline script en index.html + js/theme.js):
+   elección del usuario o, si no la hay, la del sistema. */
+:root[data-theme="light"] {
     --bg: #f4f5f7;
     --bg-2: #eceef2;
     --card: #ffffff;
@@ -81,7 +82,6 @@
     --danger-soft: rgba(220, 38, 38, 0.10);
     --shadow: 0 6px 18px rgba(20, 30, 50, 0.08);
     color-scheme: light;
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -150,6 +150,20 @@ h1, h2, h3, h4 { font-family: var(--font-display); letter-spacing: 0.01em; line-
 }
 .topbar__brand em { font-style: normal; color: var(--primary-text); }
 .topbar__logo { color: var(--primary); }
+.topbar__actions { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.topbar__theme {
+  flex: 0 0 auto;
+  width: 38px; height: 38px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease);
+}
+.topbar__theme:hover { color: var(--primary-text); border-color: var(--border-strong); }
+.topbar__theme:active { background: var(--card-2); }
 .topbar__profile {
   flex: 0 0 auto;
   display: inline-flex;
@@ -165,7 +179,7 @@ h1, h2, h3, h4 { font-family: var(--font-display); letter-spacing: 0.01em; line-
   padding: 7px 10px 7px 12px;
   min-height: 38px;
   cursor: pointer;
-  max-width: 55%;
+  max-width: 46vw;
   transition: background var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease);
 }
 .topbar__profile-name { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
