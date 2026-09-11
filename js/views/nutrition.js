@@ -341,23 +341,13 @@ function calculatorCard(profile, latest, root) {
   const proteinInput = el("input", { type: "number", step: "0.1", value: profile.protein_g_per_kg ?? "", inputmode: "decimal" });
   const fatInput = el("input", { type: "number", step: "0.1", value: profile.fat_g_per_kg ?? "", inputmode: "decimal" });
 
-  // Base de la proteína: peso total o masa magra. Al cambiar, el g/kg se
-  // reescala para que el objetivo en gramos no salte de golpe (2,4 total ≈ 2,8 magra).
+  // Base de la proteína: peso total o masa magra. El g/kg NO se reescala al
+  // cambiar: la misma exigencia por kilo sobre músculo da otra cifra, y eso es
+  // justo lo que se quiere ver. El hint indica el rango habitual de cada base.
   const basisSel = el("select", {});
   for (const [val, txt] of Object.entries(LABELS.protein_basis)) {
     basisSel.append(el("option", { value: val, selected: (profile.protein_basis || "total") === val }, txt));
   }
-  const leanKg = latest.body_fat_pct != null ? Number(latest.weight_kg) * (1 - Number(latest.body_fat_pct) / 100) : null;
-  let prevBasis = basisSel.value;
-  basisSel.addEventListener("change", () => {
-    const g = Number(proteinInput.value);
-    if (leanKg && g) {
-      const w = Number(latest.weight_kg);
-      if (prevBasis === "total" && basisSel.value === "lean") proteinInput.value = (g * w / leanKg).toFixed(1);
-      if (prevBasis === "lean" && basisSel.value === "total") proteinInput.value = (g * leanKg / w).toFixed(1);
-    }
-    prevBasis = basisSel.value;
-  });
 
   // ---- Celdas de resultado (se rellenan en recalc) ---------------------------
   const outLean = el("td", { class: "num" }, "—");
@@ -391,8 +381,8 @@ function calculatorCard(profile, latest, root) {
 
     outLean.textContent = m.leanMass != null ? fmt(m.leanMass, 1) : "—";
     proteinHint.textContent = m.proteinBasis === "lean"
-      ? ` · sobre ${fmt(m.proteinBase, 1)} kg magros`
-      : ` · sobre ${fmt(m.proteinBase, 1)} kg totales`;
+      ? ` · sobre ${fmt(m.proteinBase, 1)} kg magros · habitual 2,3–3,1 g/kg`
+      : ` · sobre ${fmt(m.proteinBase, 1)} kg totales · habitual 1,6–2,2 g/kg`;
     outBmr.textContent = fmt(m.bmr, 0);
     outTdeeIni.textContent = fmt(m.tdee, 0);
     outAdjust.textContent = (m.adjustmentKcal > 0 ? "+" : "") + fmt(m.adjustmentKcal, 0);
