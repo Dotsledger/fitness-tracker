@@ -47,4 +47,8 @@ export const LABELS = {
     male: "Hombre",
     female: "Mujer",
   },
+  protein_basis: {
+    total: "Peso total",
+    lean: "Masa magra",
+  },
 };

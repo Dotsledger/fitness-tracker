@@ -4,7 +4,7 @@
 // ============================================================================
 
 import { Profile, BodyMetrics, Foods, Menus, MealSlots, MealItems } from "../db.js";
-import { computeMacros } from "../macros.js";
+import { computeMacros, averageMetrics } from "../macros.js";
 import { LABELS } from "../config.js";
 import { el, clear, loading, fmt, toast, showError, ageFrom } from "../utils.js";
 import { CHART_COLORS } from "../charts.js";
@@ -14,14 +14,16 @@ export async function renderNutrition(root) {
   loading(root);
   const [profile, metrics, menu, foods] = await Promise.all([
     Profile.get(),
-    BodyMetrics.latest().then((m) => (m ? [m] : [])).catch(() => []),
+    BodyMetrics.list(7).catch(() => []),
     Menus.active().catch(() => null),
     Foods.list().catch(() => []),
   ]);
   // Comidas del menú activo, y después sus items (solo los de esas comidas).
   const slots = menu ? await MealSlots.list(menu.id).catch(() => []) : [];
   const items = await MealItems.list(slots.map((s) => s.id)).catch(() => []);
-  const latest = metrics.length ? metrics[0] : null;
+  // Media de las últimas 7 mediciones: la bioimpedancia baila ±2 puntos de un
+  // día a otro y el objetivo de proteína no debe bailar con ella.
+  const latest = averageMetrics(metrics, 7);
   const macros = computeMacros(profile, latest);
 
   clear(root);
@@ -65,8 +67,10 @@ function macrosCard(macros) {
   ]);
   card.append(kcal);
 
+  const leanNote = macros.proteinBasis === "lean" ? ` · proteína sobre ${fmt(macros.leanMass, 1)} kg magros` : "";
+  const sampleNote = macros.sample > 1 ? ` · media de ${macros.sample} mediciones` : "";
   const detail = el("div", { class: "kcal-detail muted" },
-    `TMB ${fmt(macros.bmr, 0)} · TDEE ${fmt(macros.tdee, 0)} · ${macros.age ?? "—"} años · ×${macros.activityMultiplier}`);
+    `TMB ${fmt(macros.bmr, 0)} · TDEE ${fmt(macros.tdee, 0)} · ${macros.age ?? "—"} años · ×${macros.activityMultiplier}${leanNote}${sampleNote}`);
   card.append(detail);
 
   const macroGrid = el("div", { class: "grid grid--macros" });
@@ -337,7 +341,27 @@ function calculatorCard(profile, latest, root) {
   const proteinInput = el("input", { type: "number", step: "0.1", value: profile.protein_g_per_kg ?? "", inputmode: "decimal" });
   const fatInput = el("input", { type: "number", step: "0.1", value: profile.fat_g_per_kg ?? "", inputmode: "decimal" });
 
+  // Base de la proteína: peso total o masa magra. Al cambiar, el g/kg se
+  // reescala para que el objetivo en gramos no salte de golpe (2,4 total ≈ 2,8 magra).
+  const basisSel = el("select", {});
+  for (const [val, txt] of Object.entries(LABELS.protein_basis)) {
+    basisSel.append(el("option", { value: val, selected: (profile.protein_basis || "total") === val }, txt));
+  }
+  const leanKg = latest.body_fat_pct != null ? Number(latest.weight_kg) * (1 - Number(latest.body_fat_pct) / 100) : null;
+  let prevBasis = basisSel.value;
+  basisSel.addEventListener("change", () => {
+    const g = Number(proteinInput.value);
+    if (leanKg && g) {
+      const w = Number(latest.weight_kg);
+      if (prevBasis === "total" && basisSel.value === "lean") proteinInput.value = (g * w / leanKg).toFixed(1);
+      if (prevBasis === "lean" && basisSel.value === "total") proteinInput.value = (g * leanKg / w).toFixed(1);
+    }
+    prevBasis = basisSel.value;
+  });
+
   // ---- Celdas de resultado (se rellenan en recalc) ---------------------------
+  const outLean = el("td", { class: "num" }, "—");
+  const proteinHint = el("small", { class: "muted" });
   const outBmr = el("td", { class: "num" }, "—");
   const outTdeeIni = el("td", { class: "num" }, "—");
   const outAdjust = el("td", { class: "num" }, "—");
@@ -359,11 +383,16 @@ function calculatorCard(profile, latest, root) {
       calorie_adjustment_pct: Number(pctInput.value) || 0,
       protein_g_per_kg: Number(proteinInput.value) || 0,
       fat_g_per_kg: Number(fatInput.value) || 0,
+      protein_basis: basisSel.value,
     };
     const m = computeMacros(draft, latest);
     clear(warnBox);
     if (!m) return;
 
+    outLean.textContent = m.leanMass != null ? fmt(m.leanMass, 1) : "—";
+    proteinHint.textContent = m.proteinBasis === "lean"
+      ? ` · sobre ${fmt(m.proteinBase, 1)} kg magros`
+      : ` · sobre ${fmt(m.proteinBase, 1)} kg totales`;
     outBmr.textContent = fmt(m.bmr, 0);
     outTdeeIni.textContent = fmt(m.tdee, 0);
     outAdjust.textContent = (m.adjustmentKcal > 0 ? "+" : "") + fmt(m.adjustmentKcal, 0);
@@ -382,16 +411,19 @@ function calculatorCard(profile, latest, root) {
 
     (m.warnings || []).forEach((w) => warnBox.append(el("p", { class: "warn" }, [icon("alert", 16), w])));
   }
-  [activitySel, pctInput, proteinInput, fatInput].forEach((inp) => {
+  [activitySel, pctInput, proteinInput, fatInput, basisSel].forEach((inp) => {
     inp.addEventListener("input", recalc);
     inp.addEventListener("change", recalc);
   });
 
   // ---- Tabla 1: TMB → TDEE → objetivo ----------------------------------------
   const age = profile.birth_date ? ageFrom(profile.birth_date) : null;
+  const sampleNote = latest.sample > 1 ? ` · media de ${latest.sample} mediciones` : "";
   card.append(el("div", { class: "table-wrap" }, el("table", { class: "table calc-table" }, [
     el("tbody", {}, [
-      el("tr", {}, [el("td", {}, "Peso (kg)"), el("td", { class: "num" }, fmt(latest.weight_kg))]),
+      el("tr", {}, [el("td", {}, ["Peso (kg)", el("small", { class: "muted" }, sampleNote)]), el("td", { class: "num" }, fmt(latest.weight_kg))]),
+      el("tr", {}, [el("td", {}, "% grasa"), el("td", { class: "num" }, latest.body_fat_pct != null ? fmt(latest.body_fat_pct, 1) : "—")]),
+      el("tr", {}, [el("td", {}, "Masa magra (kg)"), outLean]),
       el("tr", {}, [el("td", {}, "Edad"), el("td", { class: "num" }, age ?? "—")]),
       el("tr", {}, [el("td", {}, "Altura (cm)"), el("td", { class: "num" }, profile.height_cm ?? "—")]),
       el("tr", {}, [el("td", {}, "TMB"), outBmr]),
@@ -407,7 +439,8 @@ function calculatorCard(profile, latest, root) {
   card.append(el("div", { class: "table-wrap" }, el("table", { class: "table calc-table" }, [
     el("thead", {}, el("tr", {}, ["", "g/kg", "Gramos", "Kcal"].map((h) => el("th", {}, h)))),
     el("tbody", {}, [
-      el("tr", {}, [el("td", {}, "Proteína"), el("td", { class: "num" }, proteinInput), outProteinG, outProteinK]),
+      el("tr", {}, [el("td", {}, "Base de la proteína"), el("td", { class: "num", colspan: "3" }, basisSel)]),
+      el("tr", {}, [el("td", {}, ["Proteína", proteinHint]), el("td", { class: "num" }, proteinInput), outProteinG, outProteinK]),
       el("tr", {}, [el("td", {}, "Grasa"), el("td", { class: "num" }, fatInput), outFatG, outFatK]),
       el("tr", {}, [el("td", {}, "Carbohidratos"), el("td", { class: "num muted small" }, "resto"), outCarbsG, outCarbsK]),
     ]),
@@ -425,6 +458,7 @@ function calculatorCard(profile, latest, root) {
         calorie_adjustment_pct: Number(pctInput.value) || 0,
         protein_g_per_kg: Number(proteinInput.value) || 0,
         fat_g_per_kg: Number(fatInput.value) || 0,
+        protein_basis: basisSel.value,
       });
       toast("Calculadora guardada");
       renderNutrition(root);

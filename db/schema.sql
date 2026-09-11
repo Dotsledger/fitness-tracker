@@ -36,7 +36,8 @@ create table if not exists profile (
   formula text default 'mifflin_st_jeor',
   calorie_adjustment_pct numeric default 0,    -- % de ajuste sobre el TDEE inicial (+superávit/-déficit)
   manual_calorie_override numeric,             -- si se rellena, ignora el cálculo automático
-  protein_g_per_kg numeric default 2.2,        -- gramos de proteína por kg de peso total
+  protein_g_per_kg numeric default 2.2,        -- gramos de proteína por kg (de la base elegida abajo)
+  protein_basis text default 'total' check (protein_basis in ('total','lean')), -- 'lean' = masa magra (peso × (1 − % grasa))
   fat_g_per_kg numeric default 0.8,            -- gramos de grasa por kg de peso total
   notes text,
   updated_at timestamptz default now()
