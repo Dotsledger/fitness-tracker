@@ -10,6 +10,7 @@ import { el, clear, loading, toast, showError, confirmAction, emptyState, today,
 import { actionMenu, dragHandle, kebabButton } from "../ui.js";
 import { makeSortable } from "../dnd.js";
 import { exerciseIcon } from "../exercise-icons.js";
+import { icon } from "../icons.js";
 
 export async function renderRoutine(root) {
   loading(root);
@@ -19,7 +20,7 @@ export async function renderRoutine(root) {
     clear(root);
     root.append(el("h1", { class: "view-title" }, "Rutina"));
     root.append(emptyState("No hay ningún programa activo", "Crea o activa uno en Programas."));
-    root.append(el("a", { class: "btn btn--primary", href: "#/programs" }, "🗂  Programas"));
+    root.append(el("a", { class: "btn btn--primary", href: "#/programs" }, [icon("folder", 18), "Programas"]));
     return;
   }
 
@@ -57,7 +58,7 @@ export async function renderRoutine(root) {
 
   if (!days.length) {
     root.append(emptyState("Este programa aún no tiene días", "Crea el primero arriba (Push / Pull / Legs...)."));
-    root.append(el("a", { class: "btn btn--ghost field--wide", href: "#/programs" }, "🗂  Programas"));
+    root.append(el("a", { class: "btn btn--ghost field--wide", href: "#/programs" }, [icon("folder", 18), "Programas"]));
     return;
   }
 
@@ -72,10 +73,10 @@ export async function renderRoutine(root) {
   root.append(daysHost);
 
   // Accesos secundarios (fuera de la barra inferior)
-  root.append(el("a", { class: "btn btn--ghost field--wide", href: "#/programs" },
-    "🗂  Programas"));
-  root.append(el("a", { class: "btn btn--ghost field--wide", href: "#/exercises" },
-    "📋  Catálogo de ejercicios"));
+  root.append(el("div", { class: "grid grid--actions" }, [
+    el("a", { class: "btn btn--ghost", href: "#/programs" }, [icon("folder", 18), "Programas"]),
+    el("a", { class: "btn btn--ghost", href: "#/exercises" }, [icon("list", 18), "Catálogo de ejercicios"]),
+  ]));
   makeSortable(daysHost, {
     handle: ".drag-day",
     onReorder: async (cards) => {
@@ -91,7 +92,7 @@ export async function renderRoutine(root) {
 // de cardio. Tocar una fila abre el menú para cambiar la fuerza o la nota.
 function weekCard(program, schedule, days, root) {
   const card = el("div", { class: "card" });
-  card.append(el("h2", { class: "card__title" }, `📅 Semana · ${program.name}`));
+  card.append(el("h2", { class: "card__title" }, [icon("calendar", 18), `Semana · ${program.name}`]));
 
   const todayIdx = weekdayIndex(today());
   const bySlot = new Map(schedule.map((s) => [s.weekday, s]));
@@ -99,34 +100,42 @@ function weekCard(program, schedule, days, root) {
   for (let wd = 0; wd < 7; wd++) {
     const slot = bySlot.get(wd) || null;
     const strength = slot?.day?.name || null;
+    const isToday = wd === todayIdx;
 
     const row = el("div", {
-      class: "list-row list-row--tap" + (wd === todayIdx ? " week-row--today" : ""),
+      class: "list-row list-row--tap week-row"
+        + (strength ? "" : " week-row--rest")
+        + (isToday ? " week-row--today" : ""),
+      role: "button", tabindex: "0",
     }, [
-      el("div", { class: "week-row__day" }, WEEKDAYS[wd] + (wd === todayIdx ? " · hoy" : "")),
+      el("div", { class: "week-row__day" }, [
+        WEEKDAYS[wd],
+        isToday ? el("span", { class: "week-row__today" }, "Hoy") : null,
+      ]),
       el("div", { class: "list-row__main" }, [
-        el("div", { class: "list-row__title" + (strength ? "" : " muted") }, strength || "Descanso"),
+        el("div", { class: "list-row__title" }, strength || "Descanso"),
         slot?.note ? el("div", { class: "list-row__sub" }, slot.note) : null,
       ]),
+      el("span", { class: "chevron" }, icon("chevron-right", 18)),
     ]);
 
     row.addEventListener("click", () => actionMenu(row, [
       ...days.map((d) => ({
-        icon: "🏋", label: d.name,
+        icon: "dumbbell", label: d.name,
         onClick: async () => {
           try { await RoutineSchedule.set(program.id, wd, { routine_day_id: d.id, note: slot?.note ?? null }); renderRoutine(root); }
           catch (e) { showError(e); }
         },
       })),
       {
-        icon: "😴", label: "Sin fuerza (descanso)",
+        icon: "moon", label: "Sin fuerza (descanso)",
         onClick: async () => {
           try { await RoutineSchedule.set(program.id, wd, { routine_day_id: null, note: slot?.note ?? null }); renderRoutine(root); }
           catch (e) { showError(e); }
         },
       },
       {
-        icon: "✎", label: "Nota de cardio…",
+        icon: "pencil", label: "Nota de cardio…",
         onClick: async () => {
           const note = prompt("Nota del día (cardio, descanso...)", slot?.note ?? "");
           if (note == null) return;
@@ -151,9 +160,9 @@ function dayCard(day, planned, allDays, catalog, root) {
 
   const kebab = kebabButton("Opciones del día");
   kebab.addEventListener("click", () => actionMenu(kebab, [
-    { icon: "✎", label: "Renombrar", onClick: () => renameDay(day, root) },
+    { icon: "pencil", label: "Renombrar", onClick: () => renameDay(day, root) },
     {
-      icon: day.is_active ? "⏸" : "▶",
+      icon: day.is_active ? "pause" : "play",
       label: day.is_active ? "Desactivar" : "Activar",
       onClick: async () => {
         try { await RoutineDays.update(day.id, { is_active: !day.is_active }); renderRoutine(root); }
@@ -161,7 +170,7 @@ function dayCard(day, planned, allDays, catalog, root) {
       },
     },
     {
-      icon: "🗑", label: "Eliminar día", danger: true,
+      icon: "trash", label: "Eliminar día", danger: true,
       onClick: async () => {
         if (!confirmAction(`¿Eliminar el día "${day.name}"? Se borran sus asignaciones (no el historial).`)) return;
         try { await RoutineDays.remove(day.id); toast("Día eliminado"); renderRoutine(root); }
@@ -231,15 +240,15 @@ function plannedRow(pe, allDays, root) {
   const target = [pe.target_sets ? `${pe.target_sets} series` : null, pe.target_reps].filter(Boolean).join(" × ");
   const sub = [
     target || "sin objetivo",
-    pe.target_rest_sec ? `⏱ ${pe.target_rest_sec}s` : null,
+    pe.target_rest_sec ? `${pe.target_rest_sec}s descanso` : null,
     ex.muscle_group || null,
   ].filter(Boolean).join(" · ");
 
   const kebab = kebabButton("Opciones del ejercicio");
   kebab.addEventListener("click", () => actionMenu(kebab, [
-    { icon: "✎", label: "Editar objetivo", onClick: () => editTarget(pe, root) },
+    { icon: "pencil", label: "Editar objetivo", onClick: () => editTarget(pe, root) },
     {
-      icon: "⇄", label: "Mover a…",
+      icon: "arrow-right", label: "Mover a…",
       children: allDays.filter((d) => d.id !== pe.routine_day_id).map((d) => ({
         label: d.name,
         onClick: async () => {
@@ -249,7 +258,7 @@ function plannedRow(pe, allDays, root) {
       })),
     },
     {
-      icon: "✕", label: "Quitar del día", danger: true,
+      icon: "x", label: "Quitar del día", danger: true,
       onClick: async () => {
         try { await RoutineExercises.remove(pe.id); renderRoutine(root); } catch (e) { showError(e); }
       },

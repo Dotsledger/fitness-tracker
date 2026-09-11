@@ -8,14 +8,15 @@
 import { Menus, MealSlots, MealItems, DEFAULT_SLOTS } from "../db.js";
 import { el, clear, loading, toast, showError, confirmAction, emptyState } from "../utils.js";
 import { actionMenu, kebabButton } from "../ui.js";
+import { icon } from "../icons.js";
 
 export async function renderMenus(root) {
   loading(root);
   const menus = await Menus.list();
 
   clear(root);
-  root.append(el("a", { class: "back-link", href: "#/nutrition" }, "← Nutrición"));
-  root.append(el("h1", { class: "view-title" }, "📒 Menús"));
+  root.append(el("a", { class: "back-link", href: "#/nutrition" }, [icon("chevron-left", 16), "Nutrición"]));
+  root.append(el("h1", { class: "view-title" }, "Menús"));
 
   // ---- Crear menú -----------------------------------------------------------
   const addCard = el("div", { class: "card" });
@@ -56,13 +57,15 @@ export async function renderMenus(root) {
 function menuRow(menu, slots, root) {
   const sub = [
     `${slots.length} ${slots.length === 1 ? "comida" : "comidas"}`,
-    menu.is_active ? "✅ activo" : null,
-  ].filter(Boolean).join(" · ");
+    menu.is_active ? " · " : null,
+    menu.is_active ? icon("check-circle", 14) : null,
+    menu.is_active ? "Activo" : null,
+  ];
 
   const kebab = kebabButton("Opciones del menú");
   kebab.addEventListener("click", () => actionMenu(kebab, [
     !menu.is_active ? {
-      icon: "▶", label: "Activar",
+      icon: "play", label: "Activar",
       onClick: async () => {
         try {
           await Menus.activate(menu.id);
@@ -72,7 +75,7 @@ function menuRow(menu, slots, root) {
       },
     } : null,
     {
-      icon: "✎", label: "Renombrar",
+      icon: "pencil", label: "Renombrar",
       onClick: async () => {
         const name = prompt("Nuevo nombre del menú", menu.name);
         if (name == null || !name.trim()) return;
@@ -81,11 +84,11 @@ function menuRow(menu, slots, root) {
       },
     },
     {
-      icon: "⧉", label: "Duplicar",
+      icon: "copy", label: "Duplicar",
       onClick: () => duplicateMenu(menu, slots, root),
     },
     {
-      icon: "🗑", label: "Eliminar", danger: true,
+      icon: "trash", label: "Eliminar", danger: true,
       onClick: async () => {
         if (menu.is_active) {
           toast("Es el menú activo: activa otro antes de eliminarlo", "err");

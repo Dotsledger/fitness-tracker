@@ -9,14 +9,15 @@
 import { Foods } from "../db.js";
 import { el, clear, loading, fmt, toast, showError, confirmAction, emptyState } from "../utils.js";
 import { actionMenu, kebabButton } from "../ui.js";
+import { icon } from "../icons.js";
 
 export async function renderFoods(root) {
   loading(root);
   const list = await Foods.list({ includeInactive: true });
   clear(root);
 
-  root.append(el("a", { class: "back-link", href: "#/nutrition" }, "← Nutrición"));
-  root.append(el("h1", { class: "view-title" }, "🥫 Biblioteca de alimentos"));
+  root.append(el("a", { class: "back-link", href: "#/nutrition" }, [icon("chevron-left", 16), "Nutrición"]));
+  root.append(el("h1", { class: "view-title" }, "Biblioteca de alimentos"));
 
   root.append(formCard(root, list));
 
@@ -139,11 +140,11 @@ function foodRow(f, root) {
   const kebab = kebabButton("Opciones del alimento");
   kebab.addEventListener("click", () => actionMenu(kebab, [
     {
-      icon: "✎", label: "Editar",
+      icon: "pencil", label: "Editar",
       onClick: () => { editingFood = f; renderFoods(root).then(() => window.scrollTo(0, 0)); },
     },
     {
-      icon: f.is_active ? "⏸" : "▶",
+      icon: f.is_active ? "pause" : "play",
       label: f.is_active ? "Desactivar (ocultar sin borrar)" : "Activar",
       onClick: async () => {
         try { await Foods.update(f.id, { is_active: !f.is_active }); renderFoods(root); }
@@ -151,7 +152,7 @@ function foodRow(f, root) {
       },
     },
     {
-      icon: "🗑", label: "Eliminar", danger: true,
+      icon: "trash", label: "Eliminar", danger: true,
       onClick: async () => {
         if (!confirmAction(`¿Eliminar "${f.name}"? Se quitará también de las comidas donde aparezca.`)) return;
         try { await Foods.remove(f.id); toast("Eliminado"); renderFoods(root); }

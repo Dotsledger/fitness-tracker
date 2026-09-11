@@ -81,9 +81,9 @@ function exerciseRow(ex, root) {
 
   const kebab = kebabButton("Opciones del ejercicio");
   kebab.addEventListener("click", () => actionMenu(kebab, [
-    { icon: "✎", label: "Editar", onClick: () => editExercise(ex, root) },
+    { icon: "pencil", label: "Editar", onClick: () => editExercise(ex, root) },
     {
-      icon: ex.is_active ? "⏸" : "▶",
+      icon: ex.is_active ? "pause" : "play",
       label: ex.is_active ? "Desactivar (ocultar sin borrar)" : "Activar",
       onClick: async () => {
         try { await Exercises.update(ex.id, { is_active: !ex.is_active }); renderExercises(root); }
@@ -91,7 +91,7 @@ function exerciseRow(ex, root) {
       },
     },
     {
-      icon: "🗑", label: "Eliminar", danger: true,
+      icon: "trash", label: "Eliminar", danger: true,
       onClick: async () => {
         if (!confirmAction(`¿Eliminar "${ex.name}"? Se quitará también de las rutinas. El historial de series se conserva.`)) return;
         try { await Exercises.remove(ex.id); toast("Eliminado"); renderExercises(root); }

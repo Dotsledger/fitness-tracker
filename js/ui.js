@@ -3,6 +3,12 @@
 // ============================================================================
 
 import { el, clear } from "./utils.js";
+import { icon, hasIcon } from "./icons.js";
+
+// `icon` de un item puede ser un nombre del set SVG ("pencil") o texto legado.
+function menuIcon(name) {
+  return hasIcon(name) ? icon(name, 18) : (name || "");
+}
 
 let activeMenu = null;
 
@@ -30,16 +36,16 @@ export function actionMenu(anchor, items, opts = {}) {
     if (title) panel.append(el("div", { class: "menu-title" }, title));
     if (parentLabel) {
       const back = el("button", { class: "menu-item", type: "button" }, [
-        el("span", { class: "menu-item__icon" }, "‹"), "Volver",
+        el("span", { class: "menu-item__icon" }, icon("chevron-left", 18)), "Volver",
       ]);
       back.addEventListener("click", (ev) => { ev.stopPropagation(); renderList(items, null); });
       panel.append(back);
     }
     for (const it of list) {
       const btn = el("button", { class: "menu-item" + (it.danger ? " menu-item--danger" : ""), type: "button" }, [
-        el("span", { class: "menu-item__icon" }, it.icon || ""),
+        el("span", { class: "menu-item__icon" }, menuIcon(it.icon)),
         it.label,
-        it.children ? el("span", { class: "menu-item__chev" }, "›") : null,
+        it.children ? el("span", { class: "menu-item__chev" }, icon("chevron-right", 18)) : null,
       ]);
       btn.addEventListener("click", (ev) => {
         ev.stopPropagation();

@@ -68,10 +68,10 @@ export function lineChart(canvas, { labels, datasets, height }) {
 }
 
 export const CHART_COLORS = {
-  weight: "#4f9cf9",
-  fat: "#f97362",
-  muscle: "#4fd1a1",
-  water: "#5bc0de",
-  volume: "#b07cf9",
-  reps: "#f9b24f",
+  weight: "#f97316",
+  fat: "#f05252",
+  muscle: "#22c55e",
+  water: "#38bdf8",
+  volume: "#a78bfa",
+  reps: "#fbbf24",
 };

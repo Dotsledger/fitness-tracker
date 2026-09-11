@@ -8,6 +8,7 @@ import { computeMacros } from "../macros.js";
 import { LABELS } from "../config.js";
 import { el, clear, loading, fmt, toast, showError, ageFrom } from "../utils.js";
 import { CHART_COLORS } from "../charts.js";
+import { icon } from "../icons.js";
 
 export async function renderNutrition(root) {
   loading(root);
@@ -34,9 +35,9 @@ export async function renderNutrition(root) {
     root.append(dietPlanCard(menu, slots, items, foods, root));
   } else {
     const card = el("div", { class: "card" });
-    card.append(el("h2", { class: "card__title" }, "🍽 Tu dieta"));
+    card.append(el("h2", { class: "card__title" }, [icon("utensils", 18), "Tu dieta"]));
     card.append(el("p", { class: "muted" }, "No hay ningún menú activo. Crea o activa uno en Menús."));
-    card.append(el("a", { class: "btn btn--primary", href: "#/menus" }, "📒 Menús"));
+    card.append(el("a", { class: "btn btn--primary", href: "#/menus" }, [icon("book", 18), "Menús"]));
     root.append(card);
   }
 
@@ -52,7 +53,7 @@ function macrosCard(macros) {
     card.append(el("p", { class: "muted" },
       "Faltan datos para calcular. Necesitas una medición de peso y el perfil (altura/edad/sexo) completo."));
     if (macros?.warnings?.length) {
-      macros.warnings.forEach((w) => card.append(el("p", { class: "warn" }, "⚠ " + w)));
+      macros.warnings.forEach((w) => card.append(el("p", { class: "warn" }, [icon("alert", 16), w])));
     }
     return card;
   }
@@ -75,7 +76,7 @@ function macrosCard(macros) {
   card.append(macroGrid);
 
   if (macros.warnings?.length) {
-    macros.warnings.forEach((w) => card.append(el("p", { class: "warn" }, "⚠ " + w)));
+    macros.warnings.forEach((w) => card.append(el("p", { class: "warn" }, [icon("alert", 16), w])));
   }
   return card;
 }
@@ -105,7 +106,7 @@ function fmtAmt(n) {
 
 function dietPlanCard(menu, slots, items, foods, root) {
   const card = el("div", { class: "card" });
-  card.append(el("h2", { class: "card__title" }, "🍽 Tu dieta"));
+  card.append(el("h2", { class: "card__title" }, [icon("utensils", 18), "Tu dieta"]));
 
   card.append(el("h3", { class: "sub" }, `Cuaderno nutricional · ${menu.name}`));
   card.append(el("p", { class: "muted small" },
@@ -131,7 +132,11 @@ function dietPlanCard(menu, slots, items, foods, root) {
   card.classList.toggle("ledger-lite", !macrosVisible);
   const macroBtn = el("button", { type: "button", class: "ledger-macros-btn" });
   const syncMacroBtn = () => {
-    macroBtn.textContent = macrosVisible ? "▾ Ocultar valores nutricionales" : "▸ Ver valores nutricionales";
+    macroBtn.replaceChildren(
+      icon(macrosVisible ? "chevron-down" : "chevron-right", 16),
+      macrosVisible ? "Ocultar valores nutricionales" : "Ver valores nutricionales"
+    );
+    macroBtn.setAttribute("aria-expanded", String(macrosVisible));
   };
   macroBtn.addEventListener("click", () => {
     macrosVisible = !macrosVisible;
@@ -192,7 +197,7 @@ function dietPlanCard(menu, slots, items, foods, root) {
       const outH = el("td", { class: "num col-nutri" }, "0.0");
       const outG = el("td", { class: "num col-nutri" }, "0.0");
       const outK = el("td", { class: "num col-nutri" }, "0");
-      const delBtn = el("button", { type: "button", class: "ledger-del", title: `Quitar ${f.name}` }, "✕");
+      const delBtn = el("button", { type: "button", class: "ledger-del", title: `Quitar ${f.name}`, "aria-label": `Quitar ${f.name}` }, icon("x", 16));
       const tr = el("tr", {}, [
         el("td", {}, [f.name, el("div", { class: "ledger-ref" }, `ración base: ${fmt(f.amount, f.amount < 10 ? 2 : 0)} ${f.unit}`)]),
         el("td", { class: "num" }, qty),
@@ -274,7 +279,7 @@ function dietPlanCard(menu, slots, items, foods, root) {
     recalcSection();
   }
 
-  const saveBtn = el("button", { class: "btn btn--primary" }, "💾 Guardar cantidades");
+  const saveBtn = el("button", { class: "btn btn--primary" }, [icon("save", 18), "Guardar cantidades"]);
   saveBtn.addEventListener("click", async () => {
     saveBtn.disabled = true;
     try {
@@ -294,8 +299,8 @@ function dietPlanCard(menu, slots, items, foods, root) {
   });
   card.append(el("div", { class: "ledger-save" }, [
     saveBtn,
-    el("a", { class: "btn btn--ghost", href: "#/menus" }, "📒 Menús"),
-    el("a", { class: "btn btn--ghost", href: "#/foods" }, "🥫 Biblioteca de alimentos"),
+    el("a", { class: "btn btn--ghost", href: "#/menus" }, [icon("book", 18), "Menús"]),
+    el("a", { class: "btn btn--ghost", href: "#/foods" }, [icon("package", 18), "Biblioteca de alimentos"]),
   ]));
 
   return card;
@@ -309,7 +314,7 @@ function dietPlanCard(menu, slots, items, foods, root) {
 // "Guardar" persiste en profile para que el resto de la app use estos valores.
 function calculatorCard(profile, latest, root) {
   const card = el("div", { class: "card" });
-  card.append(el("h2", { class: "card__title" }, "🧮 Calculadora de macros"));
+  card.append(el("h2", { class: "card__title" }, [icon("calculator", 18), "Calculadora de macros"]));
 
   if (!profile) {
     card.append(el("p", { class: "warn" }, "No hay fila de perfil. Ejecuta db/schema.sql (crea una por defecto)."));
@@ -375,7 +380,7 @@ function calculatorCard(profile, latest, root) {
     outTotalG.textContent = fmt(totalG, 0);
     outTotalK.textContent = fmt(totalK, 0);
 
-    (m.warnings || []).forEach((w) => warnBox.append(el("p", { class: "warn" }, "⚠ " + w)));
+    (m.warnings || []).forEach((w) => warnBox.append(el("p", { class: "warn" }, [icon("alert", 16), w])));
   }
   [activitySel, pctInput, proteinInput, fatInput].forEach((inp) => {
     inp.addEventListener("input", recalc);

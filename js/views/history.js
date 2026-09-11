@@ -8,6 +8,7 @@ import {
 } from "../utils.js";
 import { navigate } from "../router.js";
 import { lineChart, CHART_COLORS } from "../charts.js";
+import { icon } from "../icons.js";
 
 // Punto de entrada: si hay param es detalle de sesión; si no, la lista.
 export async function renderHistory(root, param) {
@@ -163,7 +164,7 @@ async function renderSessionDetail(root, sessionId) {
           el("td", {}, String(s.set_number)),
           el("td", {}, fmt(s.weight_kg)),
           el("td", {}, s.reps ?? "—"),
-          el("td", {}, s.is_failure ? "✓" : ""),
+          el("td", {}, s.is_failure ? icon("check", 16, { label: "Al fallo" }) : ""),
           el("td", {}, s.rpe ?? "—"),
         ]));
       });

@@ -9,12 +9,19 @@
 
   <!-- PWA -->
   <link rel="manifest" href="./manifest.json" />
-  <meta name="theme-color" content="#0f1420" />
+  <meta name="theme-color" content="#0b0e14" media="(prefers-color-scheme: dark)" />
+  <meta name="theme-color" content="#f4f5f7" media="(prefers-color-scheme: light)" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="Fitness" />
   <link rel="apple-touch-icon" href="./icons/icon-192.png" />
   <link rel="icon" type="image/png" href="./icons/icon-192.png" />
+
+  <!-- Tipografía: Barlow Condensed (títulos y cifras) + Barlow (texto). Con
+       fallback al sistema si no hay red: nada se rompe sin las fuentes. -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600;700&display=swap" />
 
   <link rel="stylesheet" href="./css/styles.css" />
 
@@ -25,7 +32,10 @@
 <body>
   <header class="topbar">
     <div class="topbar__inner">
-      <span class="topbar__brand">🏋 Fitness Tracker</span>
+      <span class="topbar__brand">
+        <svg class="topbar__logo" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>
+        <span>Fitness<em>Tracker</em></span>
+      </span>
       <!-- El selector de perfil lo inyecta js/app.js (buildChrome) -->
     </div>
   </header>

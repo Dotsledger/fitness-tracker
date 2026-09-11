@@ -6,6 +6,7 @@ import { CONFIGURED, Profile, Menus, MealSlots, DEFAULT_SLOTS } from "./db.js";
 import { defineRoute, setOutlet, setNotFound, startRouter, navigate, currentPath } from "./router.js";
 import { el, clear, toast, showError } from "./utils.js";
 import { actionMenu } from "./ui.js";
+import { icon } from "./icons.js";
 import {
   getActiveProfile, getActiveProfileId, getProfiles, resolveActive, setActiveProfileId,
 } from "./active-profile.js";
@@ -21,18 +22,18 @@ import { renderMenus } from "./views/menus.js";
 import { renderPrograms } from "./views/programs.js";
 
 const NAV = [
-  { path: "/workout", label: "Entreno", icon: "🏋" },
-  { path: "/routine", label: "Rutina", icon: "🗓" },
-  { path: "/history", label: "Historial", icon: "📈" },
-  { path: "/nutrition", label: "Nutrición", icon: "🥗" },
-  { path: "/body", label: "Cuerpo", icon: "⚖️" },
+  { path: "/workout", label: "Entreno", icon: "dumbbell" },
+  { path: "/routine", label: "Rutina", icon: "calendar" },
+  { path: "/history", label: "Historial", icon: "trending-up" },
+  { path: "/nutrition", label: "Nutrición", icon: "utensils" },
+  { path: "/body", label: "Cuerpo", icon: "weight" },
 ];
 
 function buildChrome() {
   const nav = el("nav", { class: "tabbar", "aria-label": "Navegación principal" });
   for (const item of NAV) {
     nav.append(el("a", { href: "#" + item.path, "data-nav": true, class: "tabbar__item" }, [
-      el("span", { class: "tabbar__icon" }, item.icon),
+      el("span", { class: "tabbar__icon" }, icon(item.icon, 24)),
       el("span", { class: "tabbar__label" }, item.label),
     ]));
   }
@@ -52,16 +53,21 @@ function renderProfileSwitcher() {
   const active = getActiveProfile();
   const btn = el("button", {
     class: "topbar__profile", type: "button", title: "Cambiar de perfil",
-  }, `👤 ${active?.name || "—"} ▾`);
+    "aria-haspopup": "menu",
+  }, [
+    icon("user", 16),
+    el("span", { class: "topbar__profile-name" }, active?.name || "—"),
+    icon("chevron-down", 14, { class: "topbar__profile-chev" }),
+  ]);
 
   btn.addEventListener("click", () => actionMenu(btn, [
     ...getProfiles().map((p) => ({
-      icon: p.id === getActiveProfileId() ? "✓" : "　",
+      icon: p.id === getActiveProfileId() ? "check" : "user",
       label: p.name,
       onClick: () => switchProfile(p.id),
     })),
-    { icon: "✎", label: "Renombrar perfil", onClick: renameActiveProfile },
-    { icon: "＋", label: "Nuevo perfil", onClick: createProfile },
+    { icon: "pencil", label: "Renombrar perfil", onClick: renameActiveProfile },
+    { icon: "plus", label: "Nuevo perfil", onClick: createProfile },
   ], { title: "Perfil" }));
 
   host.append(btn);

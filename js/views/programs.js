@@ -8,6 +8,7 @@
 import { RoutinePrograms, RoutineDays, RoutineExercises, RoutineSchedule, WorkoutSessions } from "../db.js";
 import { el, clear, loading, toast, showError, confirmAction, emptyState } from "../utils.js";
 import { actionMenu, kebabButton } from "../ui.js";
+import { icon } from "../icons.js";
 
 export async function renderPrograms(root) {
   loading(root);
@@ -20,8 +21,8 @@ export async function renderPrograms(root) {
   });
 
   clear(root);
-  root.append(el("a", { class: "back-link", href: "#/routine" }, "← Rutina"));
-  root.append(el("h1", { class: "view-title" }, "🗂 Programas"));
+  root.append(el("a", { class: "back-link", href: "#/routine" }, [icon("chevron-left", 16), "Rutina"]));
+  root.append(el("h1", { class: "view-title" }, "Programas"));
 
   // ---- Crear programa -------------------------------------------------------
   const addCard = el("div", { class: "card" });
@@ -59,13 +60,15 @@ export async function renderPrograms(root) {
 function programRow(program, days, root) {
   const sub = [
     `${days.length} ${days.length === 1 ? "día" : "días"}`,
-    program.is_active ? "✅ activo" : null,
-  ].filter(Boolean).join(" · ");
+    program.is_active ? " · " : null,
+    program.is_active ? icon("check-circle", 14) : null,
+    program.is_active ? "Activo" : null,
+  ];
 
   const kebab = kebabButton("Opciones del programa");
   kebab.addEventListener("click", () => actionMenu(kebab, [
     !program.is_active ? {
-      icon: "▶", label: "Activar",
+      icon: "play", label: "Activar",
       onClick: async () => {
         try {
           await RoutinePrograms.activate(program.id);
@@ -75,7 +78,7 @@ function programRow(program, days, root) {
       },
     } : null,
     {
-      icon: "✎", label: "Renombrar",
+      icon: "pencil", label: "Renombrar",
       onClick: async () => {
         const name = prompt("Nuevo nombre del programa", program.name);
         if (name == null || !name.trim()) return;
@@ -84,11 +87,11 @@ function programRow(program, days, root) {
       },
     },
     {
-      icon: "⧉", label: "Duplicar",
+      icon: "copy", label: "Duplicar",
       onClick: () => duplicateProgram(program, days, root),
     },
     {
-      icon: "🗑", label: "Eliminar", danger: true,
+      icon: "trash", label: "Eliminar", danger: true,
       onClick: () => deleteProgram(program, days, root),
     },
   ].filter(Boolean), { title: program.name }));

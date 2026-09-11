@@ -11,10 +11,11 @@ import {
   RoutineDays, RoutineExercises, RoutinePrograms, RoutineSchedule, WorkoutSessions, WorkoutSets,
 } from "../db.js";
 import {
-  el, clear, loading, today, fmtDate, toast, showError, confirmAction, emptyState, weekdayIndex,
+  el, clear, loading, today, fmtDate, toast, showError, confirmAction, emptyState, weekdayIndex, WEEKDAYS,
 } from "../utils.js";
 import { navigate } from "../router.js";
 import { exerciseIcon } from "../exercise-icons.js";
+import { icon } from "../icons.js";
 
 // ============================================================================
 // Temporizador de descanso · barra flotante con cuenta atrás, +/- 15s,
@@ -30,7 +31,7 @@ const RestTimer = (() => {
       el("button", { class: "rest__btn", title: "-15s", on: { click: () => adjust(-15) } }, "−15"),
       el("div", { class: "rest__mid" }, [time, label]),
       el("button", { class: "rest__btn", title: "+15s", on: { click: () => adjust(15) } }, "+15"),
-      el("button", { class: "rest__btn rest__btn--close", title: "Saltar", on: { click: stop } }, "✕"),
+      el("button", { class: "rest__btn rest__btn--close", title: "Saltar", "aria-label": "Saltar descanso", on: { click: stop } }, icon("x", 18)),
     ]);
     document.body.append(bar);
   }
@@ -108,7 +109,7 @@ export async function renderWorkout(root) {
 
   if (!program) {
     root.append(emptyState("No hay ningún programa activo", "Activa o crea uno en Programas."));
-    root.append(el("a", { class: "btn btn--primary", href: "#/programs" }, "🗂  Programas"));
+    root.append(el("a", { class: "btn btn--primary", href: "#/programs" }, [icon("folder", 18), "Programas"]));
     return;
   }
 
@@ -123,9 +124,35 @@ export async function renderWorkout(root) {
     return;
   }
 
-  // ---- Selector de sesión --------------------------------------------------
+  // ---- Hoy: lo que toca según el calendario del programa ---------------------
+  const todayIso = today();
+  const wd = weekdayIndex(todayIso);
+  const slot = schedule.find((s) => s.weekday === wd) || null;
+  const todayDay = slot?.routine_day_id ? days.find((d) => d.id === slot.routine_day_id) || null : null;
+  const sessionHost = el("div", { id: "session-host" });
+
+  const hero = el("section", { class: "today-card" + (todayDay ? "" : " today-card--rest") });
+  hero.append(el("div", { class: "today-card__eyebrow" }, [
+    icon(todayDay ? "dumbbell" : "moon", 14),
+    `Hoy · ${WEEKDAYS[wd]} ${fmtDate(todayIso).slice(0, 5)}`,
+  ]));
+  hero.append(el("div", { class: "today-card__title" }, todayDay ? todayDay.name : "Descanso"));
+  const heroSub = el("div", { class: "today-card__sub" }, slot?.note || (todayDay ? "" : "Sin fuerza programada"));
+  hero.append(heroSub);
+  if (todayDay) {
+    RoutineExercises.byDay(todayDay.id).then((list) => {
+      const n = list.length;
+      heroSub.textContent = [`${n} ${n === 1 ? "ejercicio" : "ejercicios"}`, slot?.note].filter(Boolean).join(" · ");
+    }).catch(() => {});
+    const cta = el("button", { class: "btn today-card__cta", type: "button" }, [icon("play", 18), "Empezar sesión de hoy"]);
+    cta.addEventListener("click", () => startSession(sessionHost, todayIso, todayDay.id, days));
+    hero.append(cta);
+  }
+  root.append(hero);
+
+  // ---- Selector de sesión (otra fecha u otro día) ----------------------------
   const setup = el("div", { class: "card" });
-  setup.append(el("h2", { class: "card__title" }, "Nueva sesión"));
+  setup.append(el("h2", { class: "card__title" }, todayDay ? "Otra sesión" : "Registrar sesión"));
   const form = el("form", { class: "inline-form inline-form--wrap" });
   const dateInput = el("input", { type: "date", value: today() });
   const daySel = el("select", {});
@@ -149,7 +176,6 @@ export async function renderWorkout(root) {
   setup.append(form);
   root.append(setup);
 
-  const sessionHost = el("div", { id: "session-host" });
   root.append(sessionHost);
 
   form.addEventListener("submit", async (e) => {
@@ -281,13 +307,13 @@ function exerciseBlock(session, { pe, prefill, fromLast, history = [] }) {
       el("h2", { class: "card__title" }, ex.name || "(ejercicio)"),
       el("div", { class: "exercise-block__chips" }, [
         target ? el("span", { class: "chip" }, target) : null,
-        el("span", { class: "chip chip--rest" }, `⏱ ${restSec}s`),
+        el("span", { class: "chip chip--rest" }, [icon("clock", 13), `${restSec}s`]),
       ]),
     ]),
   ]));
   if (pe.notes) card.append(el("div", { class: "note-line" }, pe.notes));
   if (prefill.length && fromLast) {
-    card.append(el("div", { class: "muted small" }, "Pre-rellenado con la última vez ✎ supera tus marcas"));
+    card.append(el("div", { class: "muted small" }, "Pre-rellenado con la última vez · supera tus marcas"));
   }
 
   // Histórico de marcas del ejercicio
@@ -312,7 +338,7 @@ function exerciseBlock(session, { pe, prefill, fromLast, history = [] }) {
     if (data.is_failure) f.checked = true;
     const rpe = el("input", { type: "number", step: "0.5", min: "1", max: "10", inputmode: "decimal", value: data.rpe ?? "", class: "set-in set-in--rpe" });
     const numCell = el("span", { class: "set-num" }, String(n));
-    const del = el("button", { class: "icon-btn danger", title: "Quitar serie", type: "button" }, "✕");
+    const del = el("button", { class: "icon-btn danger", title: "Quitar serie", "aria-label": "Quitar serie", type: "button" }, icon("x", 18));
     const row = el("div", { class: "set-row" }, [numCell, w, r,
       el("span", { class: "set-check" }, f), rpe, del]);
     const entry = { row, numCell, w, r, f, rpe };
@@ -329,9 +355,9 @@ function exerciseBlock(session, { pe, prefill, fromLast, history = [] }) {
   for (let i = 0; i < initialCount; i++) addRow(prefill[i] || {});
 
   const controls = el("div", { class: "exercise-block__controls" }, [
-    el("button", { class: "btn btn--small", type: "button", on: { click: () => addRow({}) } }, "＋ Serie"),
+    el("button", { class: "btn btn--small", type: "button", on: { click: () => addRow({}) } }, [icon("plus", 18), "Serie"]),
     el("button", { class: "btn btn--small btn--rest", type: "button",
-      on: { click: () => RestTimer.start(restSec, ex.name) } }, `⏱ Descanso ${restSec}s`),
+      on: { click: () => RestTimer.start(restSec, ex.name) } }, [icon("clock", 18), `Descanso ${restSec}s`]),
     el("button", {
       class: "btn btn--primary btn--small", type: "button",
       on: { click: async (e) => {
@@ -362,7 +388,7 @@ function exerciseBlock(session, { pe, prefill, fromLast, history = [] }) {
         } catch (err) { showError(err); }
         finally { btn.disabled = false; }
       } },
-    }, "✓ Guardar ejercicio"),
+    }, [icon("check", 18), "Guardar ejercicio"]),
   ]);
   card.append(controls);
   return card;

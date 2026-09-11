@@ -9,6 +9,7 @@ import {
 } from "../utils.js";
 import { lineChart, CHART_COLORS } from "../charts.js";
 import { parseTanitaCsv } from "../tanita-csv.js";
+import { icon } from "../icons.js";
 
 export async function renderBody(root) {
   loading(root);
@@ -91,7 +92,7 @@ function personalCard(profile, root) {
 function importCard(root, metrics) {
   const existing = new Set(metrics.map((m) => m.measured_at));
   const card = el("details", { class: "card import-card" });
-  card.append(el("summary", { class: "import-card__summary" }, "📥  Importar de MyTanita (CSV)"));
+  card.append(el("summary", { class: "import-card__summary" }, [icon("download", 18), "Importar de MyTanita (CSV)"]));
   card.append(el("p", { class: "muted small" },
     "En MyTanita: My measurements → Import/Export → exporta a CSV (o te lo envían por email). Elige aquí el archivo y se añaden solo las mediciones nuevas."));
 
@@ -220,7 +221,7 @@ function metricsTableCard(metrics, root) {
           try { await BodyMetrics.remove(m.id); toast("Eliminada"); renderBody(root); }
           catch (err) { showError(err); }
         } },
-      }, "🗑")),
+      }, icon("trash", 18))),
     ]);
     tbody.append(tr);
   }
