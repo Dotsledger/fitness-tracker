@@ -352,6 +352,8 @@ function calculatorCard(profile, latest, root) {
   // ---- Celdas de resultado (se rellenan en recalc) ---------------------------
   const outLean = el("td", { class: "num" }, "—");
   const proteinHint = el("small", { class: "muted" });
+  const compareCell = el("td", { class: "muted small calc-note", colspan: "4" });
+  const compareRow = el("tr", { hidden: true }, compareCell);
   const outBmr = el("td", { class: "num" }, "—");
   const outTdeeIni = el("td", { class: "num" }, "—");
   const outAdjust = el("td", { class: "num" }, "—");
@@ -380,9 +382,25 @@ function calculatorCard(profile, latest, root) {
     if (!m) return;
 
     outLean.textContent = m.leanMass != null ? fmt(m.leanMass, 1) : "—";
-    proteinHint.textContent = m.proteinBasis === "lean"
-      ? ` · sobre ${fmt(m.proteinBase, 1)} kg magros · habitual 2,3–3,1 g/kg`
-      : ` · sobre ${fmt(m.proteinBase, 1)} kg totales · habitual 1,6–2,2 g/kg`;
+    // Equivalencia entre bases: g/kg total = g/kg magro × (1 − % grasa).
+    const gkg = Number(proteinInput.value) || 0;
+    const leanFrac = m.bodyFat != null ? 1 - m.bodyFat / 100 : null;
+    if (m.proteinBasis === "lean") {
+      const eqTotal = leanFrac ? ` (≙ ${fmt(gkg * leanFrac, 2)} g/kg de peso total)` : "";
+      proteinHint.textContent = ` · sobre ${fmt(m.proteinBase, 1)} kg magros${eqTotal} · habitual 2,3–3,1 g/kg magro`;
+    } else {
+      const eqLean = leanFrac ? ` (≙ ${fmt(gkg / leanFrac, 2)} g/kg magro)` : "";
+      proteinHint.textContent = ` · sobre ${fmt(m.proteinBase, 1)} kg totales${eqLean} · habitual 1,6–2,2 g/kg`;
+    }
+    // Mismo criterio, otra composición: enseña cómo el % de grasa mueve los gramos.
+    if (m.proteinBasis === "lean" && gkg) {
+      const w = m.weight;
+      const sims = [10, 15, 20, 25, 30].map((bf) => `${bf} % → ${fmt(gkg * w * (1 - bf / 100), 0)} g`).join(" · ");
+      compareCell.textContent = `Mismo criterio (${fmt(gkg, 1)} g/kg magro) a ${fmt(w, 1)} kg con otro % de grasa: ${sims}`;
+      compareRow.hidden = false;
+    } else {
+      compareRow.hidden = true;
+    }
     outBmr.textContent = fmt(m.bmr, 0);
     outTdeeIni.textContent = fmt(m.tdee, 0);
     outAdjust.textContent = (m.adjustmentKcal > 0 ? "+" : "") + fmt(m.adjustmentKcal, 0);
@@ -431,6 +449,7 @@ function calculatorCard(profile, latest, root) {
     el("tbody", {}, [
       el("tr", {}, [el("td", {}, "Base de la proteína"), el("td", { class: "num", colspan: "3" }, basisSel)]),
       el("tr", {}, [el("td", {}, ["Proteína", proteinHint]), el("td", { class: "num" }, proteinInput), outProteinG, outProteinK]),
+      compareRow,
       el("tr", {}, [el("td", {}, "Grasa"), el("td", { class: "num" }, fatInput), outFatG, outFatK]),
       el("tr", {}, [el("td", {}, "Carbohidratos"), el("td", { class: "num muted small" }, "resto"), outCarbsG, outCarbsK]),
     ]),

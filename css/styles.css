@@ -1013,6 +1013,7 @@ tr.ledger-subtotal td { font-weight: 700; border-top: 2px solid var(--border-str
   .calc-table select { min-width: 0; max-width: 46vw; }
   .calc-table input[type="number"] { min-width: 4rem; max-width: 5.5rem; }
 }
+.calc-table td.calc-note { white-space: normal; line-height: 1.4; padding-top: 2px; }
 tr.calc-subtotal td { border-top: 1px solid var(--border); font-weight: 600; padding-top: 10px; }
 tr.calc-highlight td {
   font-family: var(--font-display);
