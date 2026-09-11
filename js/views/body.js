@@ -151,6 +151,35 @@ function stat(label, value, sub) {
 }
 
 // ---------------------------------------------------------------------------
+// Rangos de fecha de las gráficas. La elección se recuerda (localStorage) para
+// que al volver a Cuerpo se vea el mismo tramo.
+const RANGE_KEY = "ft_body_range";
+const RANGES = [
+  { id: "15d", label: "15 d", days: 15 },
+  { id: "30d", label: "30 d", days: 30 },
+  { id: "3m", label: "3 m", days: 91 },
+  { id: "6m", label: "6 m", days: 182 },
+  { id: "1y", label: "1 año", days: 365 },
+  { id: "all", label: "Todo", days: null },
+  { id: "custom", label: "Fechas…", days: null },
+];
+
+function loadRange() {
+  try {
+    const r = JSON.parse(localStorage.getItem(RANGE_KEY) || "null");
+    if (r && RANGES.some((x) => x.id === r.id)) return r;
+  } catch { /* sin almacenamiento o JSON roto */ }
+  return { id: "all", from: null, to: null };
+}
+function saveRange(r) {
+  try { localStorage.setItem(RANGE_KEY, JSON.stringify(r)); } catch { /* modo privado */ }
+}
+// ISO local de hace n días (mediodía para esquivar el cambio de hora).
+function isoDaysAgo(n) {
+  const d = new Date(); d.setHours(12, 0, 0, 0); d.setDate(d.getDate() - n);
+  return d.toISOString().slice(0, 10);
+}
+
 function chartsCard(metrics) {
   const card = el("div", { class: "card" });
   card.append(el("h2", { class: "card__title" }, "Evolución"));
@@ -158,33 +187,99 @@ function chartsCard(metrics) {
     card.append(el("p", { class: "muted" }, "Necesitas al menos 2 mediciones."));
     return card;
   }
-  const labels = metrics.map((m) => fmtDate(m.measured_at));
 
+  let range = loadRange();
+
+  // ---- Selector de rango -----------------------------------------------------
+  const bar = el("div", { class: "range-bar", role: "group", "aria-label": "Rango de fechas" });
+  const buttons = new Map();
+  for (const r of RANGES) {
+    const b = el("button", { type: "button", class: "range-btn" }, r.label);
+    b.addEventListener("click", () => {
+      range = { id: r.id, from: range.from, to: range.to };
+      if (r.id === "custom" && !range.from) {
+        range.from = metrics[0].measured_at;
+        range.to = metrics[metrics.length - 1].measured_at;
+      }
+      saveRange(range);
+      apply();
+    });
+    buttons.set(r.id, b);
+    bar.append(b);
+  }
+  card.append(bar);
+
+  const fromInput = el("input", { type: "date" });
+  const toInput = el("input", { type: "date" });
+  const custom = el("div", { class: "range-custom" }, [
+    el("label", { class: "field" }, [el("span", {}, "Desde"), fromInput]),
+    el("label", { class: "field" }, [el("span", {}, "Hasta"), toInput]),
+  ]);
+  for (const inp of [fromInput, toInput]) {
+    inp.addEventListener("change", () => {
+      range = { id: "custom", from: fromInput.value || null, to: toInput.value || null };
+      saveRange(range);
+      apply();
+    });
+  }
+  card.append(custom);
+
+  const info = el("div", { class: "range-info muted small" });
+  card.append(info);
+
+  // ---- Gráficas --------------------------------------------------------------
   const c1 = el("canvas");
-  card.append(el("h3", { class: "sub" }, "Peso y % grasa"));
-  card.append(el("div", { class: "chart-wrap" }, c1));
-
+  const wrap1 = el("div", { class: "chart-wrap" }, c1);
   const c2 = el("canvas");
-  card.append(el("h3", { class: "sub" }, "Masa muscular"));
-  card.append(el("div", { class: "chart-wrap" }, c2));
+  const wrap2 = el("div", { class: "chart-wrap" }, c2);
+  const empty = el("p", { class: "muted", hidden: true }, "No hay mediciones suficientes en este rango.");
+  card.append(el("h3", { class: "sub" }, "Peso y % grasa"), wrap1);
+  card.append(el("h3", { class: "sub" }, "Masa muscular"), wrap2);
+  card.append(empty);
 
-  queueMicrotask(() => {
-    lineChart(c1, {
-      labels,
-      datasets: [
-        { label: "Peso (kg)", data: metrics.map((m) => m.weight_kg), color: CHART_COLORS.weight, yAxisID: "y" },
-        { label: "% Grasa", data: metrics.map((m) => m.body_fat_pct), color: CHART_COLORS.fat, yAxisID: "y1" },
-      ],
-      height: 260,
+  function bounds() {
+    const def = RANGES.find((r) => r.id === range.id) || RANGES[RANGES.length - 2];
+    if (def.id === "custom") return { from: range.from, to: range.to };
+    return { from: def.days ? isoDaysAgo(def.days) : null, to: null };
+  }
+
+  function apply() {
+    for (const [id, b] of buttons) b.setAttribute("aria-pressed", String(id === range.id));
+    custom.hidden = range.id !== "custom";
+    if (range.id === "custom") { fromInput.value = range.from || ""; toInput.value = range.to || ""; }
+
+    const { from, to } = bounds();
+    const rows = metrics.filter((m) => (!from || m.measured_at >= from) && (!to || m.measured_at <= to));
+    const enough = rows.length >= 2;
+    wrap1.hidden = wrap2.hidden = !enough;
+    empty.hidden = enough;
+    info.textContent = rows.length
+      ? `${rows.length} mediciones · ${fmtDate(rows[0].measured_at)} → ${fmtDate(rows[rows.length - 1].measured_at)}`
+      : "0 mediciones en este rango";
+    if (!enough) return;
+
+    const labels = rows.map((m) => fmtDate(m.measured_at));
+    const pointRadius = rows.length > 90 ? 0 : 2; // con muchos puntos, línea limpia
+    queueMicrotask(() => {
+      lineChart(c1, {
+        labels,
+        datasets: [
+          { label: "Peso (kg)", data: rows.map((m) => m.weight_kg), color: CHART_COLORS.weight, yAxisID: "y", pointRadius },
+          { label: "% Grasa", data: rows.map((m) => m.body_fat_pct), color: CHART_COLORS.fat, yAxisID: "y1", pointRadius },
+        ],
+        height: 260,
+      });
+      lineChart(c2, {
+        labels,
+        datasets: [
+          { label: "Masa muscular (kg)", data: rows.map((m) => m.muscle_mass_kg), color: CHART_COLORS.muscle, pointRadius },
+        ],
+        height: 220,
+      });
     });
-    lineChart(c2, {
-      labels,
-      datasets: [
-        { label: "Masa muscular (kg)", data: metrics.map((m) => m.muscle_mass_kg), color: CHART_COLORS.muscle },
-      ],
-      height: 220,
-    });
-  });
+  }
+
+  apply();
   return card;
 }
 

@@ -6,7 +6,7 @@
    Sube CACHE_VERSION al cambiar el shell.
    ========================================================================== */
 
-const CACHE_VERSION = "ft-shell-v36";
+const CACHE_VERSION = "ft-shell-v37";
 
 const SHELL = [
   "./",
@@ -38,6 +38,10 @@ const SHELL = [
   "./js/views/exercises.js",
   "./icons/icon-192.png",
   "./icons/icon-512.png",
+  "./icons/icon-maskable-512.png",
+  "./icons/apple-touch-icon.png",
+  "./icons/favicon.svg",
+  "./icons/favicon-32.png",
 ];
 
 const CDN_HOSTS = ["cdn.jsdelivr.net"];

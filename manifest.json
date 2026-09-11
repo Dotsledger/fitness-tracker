@@ -1,4 +1,5 @@
 {
+  "id": "./",
   "name": "Fitness Tracker",
   "short_name": "Fitness",
   "description": "Seguimiento personal de entrenamiento de fuerza y nutrición.",
@@ -6,8 +7,8 @@
   "scope": "./",
   "display": "standalone",
   "orientation": "any",
-  "background_color": "#0f1420",
-  "theme_color": "#0f1420",
+  "background_color": "#0b0e14",
+  "theme_color": "#0b0e14",
   "icons": [
     {
       "src": "./icons/icon-192.png",
