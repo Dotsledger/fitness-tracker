@@ -9,7 +9,7 @@ import { RoutineDays, RoutineExercises, RoutinePrograms, RoutineSchedule, Exerci
 import { el, clear, loading, toast, showError, confirmAction, emptyState, today, weekdayIndex, WEEKDAYS } from "../utils.js";
 import { actionMenu, dragHandle, kebabButton } from "../ui.js";
 import { makeSortable } from "../dnd.js";
-import { exerciseIcon } from "../exercise-icons.js";
+import { exerciseMedia } from "../exercise-media.js";
 import { icon } from "../icons.js";
 
 export async function renderRoutine(root) {
@@ -267,7 +267,7 @@ function plannedRow(pe, allDays, root) {
 
   return el("div", { class: "list-row", dataset: { reId: pe.id } }, [
     dragHandle("drag-ex"),
-    exerciseIcon(ex.name),
+    exerciseMedia(ex, { extraNote: pe.notes }),
     el("div", { class: "list-row__main" }, [
       el("div", { class: "list-row__title" }, ex.name || "(ejercicio borrado)"),
       el("div", { class: "list-row__sub" }, sub),

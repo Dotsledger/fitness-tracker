@@ -1,0 +1,391 @@
+{
+ "banded-standing-hip-abduction": {
+  "name": "Banded Standing Hip Abduction",
+  "primary": "Glutes",
+  "secondary": [
+   "Core"
+  ],
+  "equipment": "Resistance Band"
+ },
+ "dumbbell-fly": {
+  "name": "Dumbbell Fly",
+  "primary": "Chest",
+  "secondary": [
+   "Shoulders"
+  ],
+  "equipment": "Dumbbell"
+ },
+ "bird-dog": {
+  "name": "Bird Dog",
+  "primary": "Core",
+  "secondary": [
+   "Glutes",
+   "Shoulders"
+  ],
+  "equipment": "Bodyweight"
+ },
+ "walking": {
+  "name": "Walking",
+  "primary": "Legs",
+  "secondary": [
+   "Cardio"
+  ],
+  "equipment": "Cardio"
+ },
+ "treadmill-incline-walk": {
+  "name": "Treadmill Incline Walk",
+  "primary": "Legs",
+  "secondary": [
+   "Glutes",
+   "Cardio"
+  ],
+  "equipment": "Cardio"
+ },
+ "jump-rope": {
+  "name": "Jump Rope",
+  "primary": "Calves",
+  "secondary": [
+   "Cardio",
+   "Shoulders"
+  ],
+  "equipment": "Cardio"
+ },
+ "cable-crunch": {
+  "name": "Cable Crunch",
+  "primary": "Core",
+  "secondary": [],
+  "equipment": "Cable"
+ },
+ "ez-bar-curl": {
+  "name": "EZ-Bar Curl",
+  "primary": "Biceps",
+  "secondary": [
+   "Forearms"
+  ],
+  "equipment": "Barbell"
+ },
+ "bicep-curl": {
+  "name": "Bicep Curl",
+  "primary": "Biceps",
+  "secondary": [
+   "Forearms"
+  ],
+  "equipment": "Dumbbell"
+ },
+ "hammer-curl": {
+  "name": "Hammer Curl",
+  "primary": "Biceps",
+  "secondary": [
+   "Forearms"
+  ],
+  "equipment": "Dumbbell"
+ },
+ "dead-bug": {
+  "name": "Dead Bug",
+  "primary": "Core",
+  "secondary": [
+   "Legs"
+  ],
+  "equipment": "Bodyweight"
+ },
+ "pull-up": {
+  "name": "Pull-up",
+  "primary": "Lats",
+  "secondary": [
+   "Biceps",
+   "Core"
+  ],
+  "equipment": "Bodyweight"
+ },
+ "standing-calf-raise": {
+  "name": "Standing Calf Raise",
+  "primary": "Calves",
+  "secondary": [],
+  "equipment": "Machine"
+ },
+ "hanging-knee-raise": {
+  "name": "Hanging Knee Raise",
+  "primary": "Core",
+  "secondary": [
+   "Grip"
+  ],
+  "equipment": "Pull-up Bar"
+ },
+ "lateral-raise": {
+  "name": "Lateral Raise",
+  "primary": "Shoulders",
+  "secondary": [
+   "Upper Back"
+  ],
+  "equipment": "Dumbbell"
+ },
+ "overhead-tricep-extension": {
+  "name": "Overhead Tricep Extension",
+  "primary": "Triceps",
+  "secondary": [
+   "Shoulders"
+  ],
+  "equipment": "Cable"
+ },
+ "skull-crusher": {
+  "name": "Skull Crusher",
+  "primary": "Triceps",
+  "secondary": [
+   "Shoulders"
+  ],
+  "equipment": "Barbell"
+ },
+ "banded-face-pull": {
+  "name": "Banded Face Pull",
+  "primary": "Upper Back",
+  "secondary": [
+   "Rear Delts",
+   "Shoulders"
+  ],
+  "equipment": "Resistance Band"
+ },
+ "push-up": {
+  "name": "Push-up",
+  "primary": "Chest",
+  "secondary": [
+   "Triceps",
+   "Core"
+  ],
+  "equipment": "Bodyweight"
+ },
+ "bench-dip": {
+  "name": "Bench Dip",
+  "primary": "Triceps",
+  "secondary": [
+   "Chest",
+   "Shoulders"
+  ],
+  "equipment": "Bodyweight"
+ },
+ "banded-woodchop": {
+  "name": "Banded Woodchop",
+  "primary": "Core",
+  "secondary": [
+   "Shoulders",
+   "Glutes"
+  ],
+  "equipment": "Resistance Band"
+ },
+ "banded-lat-pulldown": {
+  "name": "Banded Lat Pulldown",
+  "primary": "Lats",
+  "secondary": [
+   "Biceps",
+   "Core"
+  ],
+  "equipment": "Resistance Band"
+ },
+ "banded-monster-walk": {
+  "name": "Banded Monster Walk",
+  "primary": "Glutes",
+  "secondary": [
+   "Quads",
+   "Hamstrings",
+   "Core"
+  ],
+  "equipment": "Resistance Band"
+ },
+ "banded-lateral-walk": {
+  "name": "Banded Lateral Walk",
+  "primary": "Glutes",
+  "secondary": [
+   "Quads",
+   "Core"
+  ],
+  "equipment": "Resistance Band"
+ },
+ "single-leg-romanian-deadlift": {
+  "name": "Single-Leg Romanian Deadlift",
+  "primary": "Hamstrings",
+  "secondary": [
+   "Glutes",
+   "Core"
+  ],
+  "equipment": "Dumbbell"
+ },
+ "romanian-deadlift": {
+  "name": "Romanian Deadlift",
+  "primary": "Hamstrings",
+  "secondary": [
+   "Glutes",
+   "Lower Back"
+  ],
+  "equipment": "Barbell"
+ },
+ "dumbbell-romanian-deadlift": {
+  "name": "Dumbbell Romanian Deadlift",
+  "primary": "Hamstrings",
+  "secondary": [
+   "Glutes",
+   "Lower Back"
+  ],
+  "equipment": "Dumbbell"
+ },
+ "plank": {
+  "name": "Plank",
+  "primary": "Core",
+  "secondary": [
+   "Shoulders"
+  ],
+  "equipment": "Bodyweight"
+ },
+ "side-plank": {
+  "name": "Side Plank",
+  "primary": "Core",
+  "secondary": [
+   "Shoulders"
+  ],
+  "equipment": "Bodyweight"
+ },
+ "arnold-press": {
+  "name": "Arnold Press",
+  "primary": "Shoulders",
+  "secondary": [
+   "Triceps"
+  ],
+  "equipment": "Dumbbell"
+ },
+ "dumbbell-bench-press": {
+  "name": "Dumbbell Bench Press",
+  "primary": "Chest",
+  "secondary": [
+   "Triceps",
+   "Shoulders"
+  ],
+  "equipment": "Dumbbell"
+ },
+ "standing-dumbbell-press": {
+  "name": "Standing Dumbbell Press",
+  "primary": "Shoulders",
+  "secondary": [
+   "Triceps",
+   "Core"
+  ],
+  "equipment": "Dumbbell"
+ },
+ "incline-dumbbell-press": {
+  "name": "Incline Dumbbell Press",
+  "primary": "Chest",
+  "secondary": [
+   "Shoulders",
+   "Triceps"
+  ],
+  "equipment": "Dumbbell"
+ },
+ "machine-chest-press": {
+  "name": "Machine Chest Press",
+  "primary": "Chest",
+  "secondary": [
+   "Triceps",
+   "Shoulders"
+  ],
+  "equipment": "Machine"
+ },
+ "glute-bridge": {
+  "name": "Glute Bridge",
+  "primary": "Glutes",
+  "secondary": [
+   "Hamstrings"
+  ],
+  "equipment": "Bodyweight"
+ },
+ "banded-row": {
+  "name": "Banded Row",
+  "primary": "Back",
+  "secondary": [
+   "Biceps",
+   "Upper Back"
+  ],
+  "equipment": "Resistance Band"
+ },
+ "one-arm-dumbbell-row": {
+  "name": "One-Arm Dumbbell Row",
+  "primary": "Back",
+  "secondary": [
+   "Biceps"
+  ],
+  "equipment": "Dumbbell"
+ },
+ "inverted-row": {
+  "name": "Inverted Row",
+  "primary": "Back",
+  "secondary": [
+   "Biceps",
+   "Core"
+  ],
+  "equipment": "Bodyweight"
+ },
+ "reverse-crunch": {
+  "name": "Reverse Crunch",
+  "primary": "Core",
+  "secondary": [],
+  "equipment": "Bodyweight"
+ },
+ "ab-wheel": {
+  "name": "Ab Wheel Rollout",
+  "primary": "Core",
+  "secondary": [
+   "Shoulders"
+  ],
+  "equipment": "Bodyweight"
+ },
+ "bodyweight-squat": {
+  "name": "Bodyweight Squat",
+  "primary": "Quads",
+  "secondary": [
+   "Glutes",
+   "Hamstrings",
+   "Core"
+  ],
+  "equipment": "Bodyweight"
+ },
+ "front-squat": {
+  "name": "Front Squat",
+  "primary": "Quads",
+  "secondary": [
+   "Core",
+   "Glutes"
+  ],
+  "equipment": "Barbell"
+ },
+ "goblet-squat": {
+  "name": "Goblet Squat",
+  "primary": "Quads",
+  "secondary": [
+   "Glutes",
+   "Core"
+  ],
+  "equipment": "Dumbbell"
+ },
+ "step-up": {
+  "name": "Step-Up",
+  "primary": "Quads",
+  "secondary": [
+   "Glutes"
+  ],
+  "equipment": "Dumbbell"
+ },
+ "bulgarian-split-squat": {
+  "name": "Bulgarian Split Squat",
+  "primary": "Quads",
+  "secondary": [
+   "Glutes",
+   "Core"
+  ],
+  "equipment": "Dumbbell"
+ },
+ "reverse-lunge": {
+  "name": "Reverse Lunge",
+  "primary": "Quads",
+  "secondary": [
+   "Glutes",
+   "Hamstrings"
+  ],
+  "equipment": "Dumbbell"
+ }
+}

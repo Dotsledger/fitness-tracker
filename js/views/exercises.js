@@ -5,7 +5,7 @@
 import { Exercises } from "../db.js";
 import { el, clear, loading, toast, showError, confirmAction, emptyState } from "../utils.js";
 import { actionMenu, kebabButton } from "../ui.js";
-import { exerciseIcon } from "../exercise-icons.js";
+import { exerciseMedia } from "../exercise-media.js";
 
 export async function renderExercises(root) {
   loading(root);
@@ -41,6 +41,13 @@ export async function renderExercises(root) {
     }
   }
   root.append(card);
+  root.append(el("p", { class: "ex-credit" }, [
+    "Ilustraciones: ",
+    el("a", { href: "https://github.com/bryllim/workout-guide", target: "_blank", rel: "noopener" }, "Workout Guide"),
+    " (Bryl Lim) y ",
+    el("a", { href: "https://github.com/everkinetic/data", target: "_blank", rel: "noopener" }, "Everkinetic"),
+    " · CC BY-SA 4.0. Toca una ilustración para ver cómo se hace el ejercicio.",
+  ]));
 }
 
 function addCard(root) {
@@ -101,7 +108,7 @@ function exerciseRow(ex, root) {
   ], { title: ex.name }));
 
   return el("div", { class: "list-row" + (ex.is_active ? "" : " list-row--muted") }, [
-    exerciseIcon(ex.name),
+    exerciseMedia(ex),
     el("div", { class: "list-row__main" }, [
       el("div", { class: "list-row__title" }, ex.name + (ex.is_active ? "" : " (inactivo)")),
       meta ? el("div", { class: "list-row__sub" }, meta) : null,
@@ -119,10 +126,13 @@ function editExercise(ex, root) {
   if (equip == null) return;
   const notes = prompt("Notas", ex.notes || "");
   if (notes == null) return;
+  const media = prompt("Ilustración (slug de Workout Guide, vacío = pictograma genérico)", ex.media_slug || "");
+  if (media == null) return;
   Exercises.update(ex.id, {
     name: name.trim(),
     muscle_group: muscle.trim() || null,
     equipment: equip.trim() || null,
     notes: notes.trim() || null,
+    media_slug: media.trim() || null,
   }).then(() => { toast("Actualizado"); renderExercises(root); }).catch(showError);
 }

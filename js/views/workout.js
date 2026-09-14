@@ -14,7 +14,7 @@ import {
   el, clear, loading, today, fmtDate, toast, showError, confirmAction, emptyState, weekdayIndex, WEEKDAYS,
 } from "../utils.js";
 import { navigate } from "../router.js";
-import { exerciseIcon } from "../exercise-icons.js";
+import { exerciseMedia } from "../exercise-media.js";
 import { icon } from "../icons.js";
 
 // ============================================================================
@@ -302,7 +302,7 @@ function exerciseBlock(session, { pe, prefill, fromLast, history = [] }) {
   const restSec = pe.target_rest_sec || 90;
   const target = [pe.target_sets ? `${pe.target_sets} series` : null, pe.target_reps].filter(Boolean).join(" × ");
   card.append(el("div", { class: "exercise-block__head" }, [
-    exerciseIcon(ex.name),
+    exerciseMedia(ex, { extraNote: pe.notes }),
     el("div", { class: "exercise-block__headmain" }, [
       el("h2", { class: "card__title" }, ex.name || "(ejercicio)"),
       el("div", { class: "exercise-block__chips" }, [
