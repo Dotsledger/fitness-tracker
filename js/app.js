@@ -4,7 +4,7 @@
 
 import { CONFIGURED, Profile, Menus, MealSlots, DEFAULT_SLOTS } from "./db.js";
 import { defineRoute, setOutlet, setNotFound, startRouter, navigate, currentPath } from "./router.js";
-import { el, clear, toast, showError } from "./utils.js";
+import { el, clear, toast, showError, preventNumberInputScroll } from "./utils.js";
 import { actionMenu } from "./ui.js";
 import { icon } from "./icons.js";
 import { initTheme, toggleTheme, currentTheme } from "./theme.js";
@@ -166,6 +166,7 @@ async function initProfiles(outlet) {
 
 async function boot() {
   initTheme();
+  preventNumberInputScroll();
   const app = document.getElementById("app");
 
   const outlet = el("main", { class: "outlet", id: "outlet" });

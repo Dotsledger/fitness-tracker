@@ -2,6 +2,24 @@
 // Utilidades · DOM, formato, fechas, toasts
 // ============================================================================
 
+// Chrome/Firefox cambian el valor de un <input type="number"> enfocado si el
+// ratón pasa por encima mientras haces scroll de la página (nadie lo pide: es
+// el "gotcha" clásico de estos inputs). Aquí sí importa, porque los diales de
+// la calculadora de macros son un borrador que no se guarda hasta pulsar
+// "Guardar" — el valor cambiaba en silencio y solo se notaba al no cuadrar con
+// lo ya guardado. Se desenfoca el input en cuanto empieza el scroll, con
+// preventDefault en el propio evento para que ese primer "tick" tampoco cambie
+// el valor; el resto del scroll sigue moviendo la página con normalidad.
+export function preventNumberInputScroll() {
+  document.addEventListener("wheel", (e) => {
+    const el = e.target;
+    if (el?.tagName === "INPUT" && el.type === "number" && el === document.activeElement) {
+      e.preventDefault();
+      el.blur();
+    }
+  }, { passive: false });
+}
+
 // Crea un elemento con atributos e hijos. `attrs.on` = { click: fn, ... }.
 export function el(tag, attrs = {}, children = []) {
   const node = document.createElement(tag);
