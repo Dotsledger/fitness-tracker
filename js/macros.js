@@ -3,40 +3,18 @@
 // ============================================================================
 // TMB con Mifflin-St Jeor (peso/altura/edad/sexo). La proteína puede calcularse
 // sobre el peso total o sobre la MASA MAGRA (peso × (1 − % grasa)): la
-// necesidad de proteína la marca el músculo a conservar, no la grasa. Como la
-// bioimpedancia baila día a día, la vista pasa una medición PROMEDIADA
-// (averageMetrics) en vez de la última suelta. Todo el "cerebro" (ajustar
-// diales) lo lleva el usuario desde la calculadora de Nutrición.
+// necesidad de proteína la marca el músculo a conservar, no la grasa. Se usa
+// siempre la ÚLTIMA medición real (no una media): con pesajes espaciados,
+// promediar varios días atrás deja el objetivo por detrás de la tendencia
+// real. Todo el "cerebro" (ajustar diales) lo lleva el usuario desde la
+// calculadora de Nutrición.
 // ============================================================================
 
 import { ACTIVITY_MULTIPLIERS } from "./config.js";
 import { ageFrom } from "./utils.js";
 
-// Promedia las últimas `n` mediciones (peso, % grasa, músculo) para amortiguar
-// el ruido de la báscula. Devuelve una "medición sintética" con la misma forma
-// que una fila de body_metrics más `sample` (nº usado) y `since` (fecha inicial).
-export function averageMetrics(metrics, n = 7) {
-  if (!metrics?.length) return null;
-  const sorted = [...metrics].sort((a, b) => (a.measured_at < b.measured_at ? -1 : 1));
-  const recent = sorted.slice(-n);
-  const avg = (key) => {
-    const vals = recent.map((m) => m[key]).filter((v) => v != null && v !== "").map(Number);
-    return vals.length ? vals.reduce((s, v) => s + v, 0) / vals.length : null;
-  };
-  const last = recent[recent.length - 1];
-  return {
-    ...last,
-    weight_kg: avg("weight_kg"),
-    body_fat_pct: avg("body_fat_pct"),
-    muscle_mass_kg: avg("muscle_mass_kg"),
-    sample: recent.length,
-    since: recent[0].measured_at,
-    measured_at: last.measured_at,
-  };
-}
-
-// Recibe el profile y una medición corporal (real o promediada). Devuelve el
-// desglose o null si falta lo mínimo (peso).
+// Recibe el profile y la última medición corporal. Devuelve el desglose o
+// null si falta lo mínimo (peso).
 export function computeMacros(profile, metric) {
   if (!profile || !metric || metric.weight_kg == null) return null;
 
@@ -102,8 +80,6 @@ export function computeMacros(profile, metric) {
     leanMass,
     proteinBasis,
     proteinBase,
-    sample: metric.sample ?? 1,
-    since: metric.since ?? metric.measured_at,
     bmr,
     activityMultiplier: mult,
     tdee, // gasto total sin ajustar (para mostrar como contexto)

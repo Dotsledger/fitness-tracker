@@ -4,26 +4,23 @@
 // ============================================================================
 
 import { Profile, BodyMetrics, Foods, Menus, MealSlots, MealItems } from "../db.js";
-import { computeMacros, averageMetrics } from "../macros.js";
+import { computeMacros } from "../macros.js";
 import { LABELS } from "../config.js";
-import { el, clear, loading, fmt, toast, showError, ageFrom } from "../utils.js";
+import { el, clear, loading, fmt, fmtDate, toast, showError, ageFrom } from "../utils.js";
 import { CHART_COLORS } from "../charts.js";
 import { icon } from "../icons.js";
 
 export async function renderNutrition(root) {
   loading(root);
-  const [profile, metrics, menu, foods] = await Promise.all([
+  const [profile, latest, menu, foods] = await Promise.all([
     Profile.get(),
-    BodyMetrics.list(7).catch(() => []),
+    BodyMetrics.latest().catch(() => null),
     Menus.active().catch(() => null),
     Foods.list().catch(() => []),
   ]);
   // Comidas del menú activo, y después sus items (solo los de esas comidas).
   const slots = menu ? await MealSlots.list(menu.id).catch(() => []) : [];
   const items = await MealItems.list(slots.map((s) => s.id)).catch(() => []);
-  // Media de las últimas 7 mediciones: la bioimpedancia baila ±2 puntos de un
-  // día a otro y el objetivo de proteína no debe bailar con ella.
-  const latest = averageMetrics(metrics, 7);
   const macros = computeMacros(profile, latest);
 
   clear(root);
@@ -68,9 +65,8 @@ function macrosCard(macros) {
   card.append(kcal);
 
   const leanNote = macros.proteinBasis === "lean" ? ` · proteína sobre ${fmt(macros.leanMass, 1)} kg magros` : "";
-  const sampleNote = macros.sample > 1 ? ` · media de ${macros.sample} mediciones` : "";
   const detail = el("div", { class: "kcal-detail muted" },
-    `TMB ${fmt(macros.bmr, 0)} · TDEE ${fmt(macros.tdee, 0)} · ${macros.age ?? "—"} años · ×${macros.activityMultiplier}${leanNote}${sampleNote}`);
+    `TMB ${fmt(macros.bmr, 0)} · TDEE ${fmt(macros.tdee, 0)} · ${macros.age ?? "—"} años · ×${macros.activityMultiplier}${leanNote}`);
   card.append(detail);
 
   const macroGrid = el("div", { class: "grid grid--macros" });
@@ -426,10 +422,10 @@ function calculatorCard(profile, latest, root) {
 
   // ---- Tabla 1: TMB → TDEE → objetivo ----------------------------------------
   const age = profile.birth_date ? ageFrom(profile.birth_date) : null;
-  const sampleNote = latest.sample > 1 ? ` · media de ${latest.sample} mediciones` : "";
+  const dateNote = ` · medición del ${fmtDate(latest.measured_at)}`;
   card.append(el("div", { class: "table-wrap" }, el("table", { class: "table calc-table" }, [
     el("tbody", {}, [
-      el("tr", {}, [el("td", {}, ["Peso (kg)", el("small", { class: "muted" }, sampleNote)]), el("td", { class: "num" }, fmt(latest.weight_kg))]),
+      el("tr", {}, [el("td", {}, ["Peso (kg)", el("small", { class: "muted" }, dateNote)]), el("td", { class: "num" }, fmt(latest.weight_kg))]),
       el("tr", {}, [el("td", {}, "% grasa"), el("td", { class: "num" }, latest.body_fat_pct != null ? fmt(latest.body_fat_pct, 1) : "—")]),
       el("tr", {}, [el("td", {}, "Masa magra (kg)"), outLean]),
       el("tr", {}, [el("td", {}, "Edad"), el("td", { class: "num" }, age ?? "—")]),
