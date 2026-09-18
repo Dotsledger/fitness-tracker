@@ -5,7 +5,7 @@
 // Fuera de la tabbar: se llega desde Nutrición (patrón /foods y /programs).
 // ============================================================================
 
-import { Menus, MealSlots, MealItems, DEFAULT_SLOTS } from "../db.js";
+import { Menus, MealSlots, DEFAULT_SLOTS } from "../db.js";
 import { el, clear, loading, toast, showError, confirmAction, emptyState } from "../utils.js";
 import { actionMenu, kebabButton } from "../ui.js";
 import { icon } from "../icons.js";
@@ -85,7 +85,13 @@ function menuRow(menu, slots, root) {
     },
     {
       icon: "copy", label: "Duplicar",
-      onClick: () => duplicateMenu(menu, slots, root),
+      onClick: async () => {
+        try {
+          const copy = await Menus.duplicate(menu, slots);
+          toast(`Duplicado como "${copy.name}"`);
+          renderMenus(root);
+        } catch (e) { showError(e); }
+      },
     },
     {
       icon: "trash", label: "Eliminar", danger: true,
@@ -108,37 +114,4 @@ function menuRow(menu, slots, root) {
     ]),
     kebab,
   ]);
-}
-
-// ---------------------------------------------------------------------------
-// Duplica un menú completo: comidas (con su orden) y alimentos de cada comida,
-// remapeando cada alimento a la comida clonada correspondiente.
-async function duplicateMenu(menu, slots, root) {
-  try {
-    const copy = await Menus.insert({ name: `${menu.name} (copia)` });
-
-    const idMap = new Map();
-    for (const s of slots) {
-      const [clone] = await MealSlots.insertMany([{
-        menu_id: copy.id,
-        slot_order: s.slot_order,
-        name: s.name,
-        optional: s.optional,
-      }]);
-      idMap.set(s.id, clone.id);
-    }
-
-    const items = await MealItems.list(slots.map((s) => s.id));
-    for (const it of items) {
-      await MealItems.insert({
-        meal_slot_id: idMap.get(it.meal_slot_id),
-        food_id: it.food_id,
-        qty: it.qty,
-        item_order: it.item_order,
-      });
-    }
-
-    toast(`Duplicado como "${copy.name}"`);
-    renderMenus(root);
-  } catch (e) { showError(e); }
 }

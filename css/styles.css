@@ -1039,6 +1039,40 @@ input[type="date"] { font-variant-numeric: tabular-nums; }
 .import-status { font-size: 0.88rem; color: var(--text-dim); margin-top: 6px; min-height: 1.2em; }
 
 /* ---- Cuaderno nutricional (desglose por ingrediente) ------------------------- */
+/* Cabecera con título + acciones compactas (biblioteca, cambiar de menú). */
+.ledger-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.ledger-head .card__title { margin: 0; flex: 1 1 auto; min-width: 0; }
+.ledger-head__actions { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
+
+/* Botón para cambiar de menú (mismo espíritu que .topbar__profile). */
+.menu-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--card-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 7px 10px 7px 12px;
+  min-height: 38px;
+  max-width: 55vw;
+  cursor: pointer;
+  transition: border-color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);
+}
+.menu-switch:hover { border-color: var(--border-strong); }
+.menu-switch:active { background: var(--card); }
+.menu-switch__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.menu-switch .ico:last-child { color: var(--muted); flex: 0 0 auto; }
+
 .ledger-summary {
   background: var(--bg-2);
   border: 1px solid var(--border);

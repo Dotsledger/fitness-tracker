@@ -3,19 +3,22 @@
 // Las mediciones corporales, histórico y gráficas están en la vista "Cuerpo".
 // ============================================================================
 
-import { Profile, BodyMetrics, Foods, Menus, MealSlots, MealItems } from "../db.js";
+import { Profile, BodyMetrics, Foods, Menus, MealSlots, MealItems, DEFAULT_SLOTS } from "../db.js";
 import { computeMacros } from "../macros.js";
 import { LABELS } from "../config.js";
 import { el, clear, loading, fmt, fmtDate, toast, showError, ageFrom } from "../utils.js";
 import { CHART_COLORS } from "../charts.js";
 import { icon } from "../icons.js";
+import { actionMenu } from "../ui.js";
+import { navigate } from "../router.js";
 
 export async function renderNutrition(root) {
   loading(root);
-  const [profile, latest, menu, foods] = await Promise.all([
+  const [profile, latest, menu, menus, foods] = await Promise.all([
     Profile.get(),
     BodyMetrics.latest().catch(() => null),
     Menus.active().catch(() => null),
+    Menus.list().catch(() => []),
     Foods.list().catch(() => []),
   ]);
   // Comidas del menú activo, y después sus items (solo los de esas comidas).
@@ -34,7 +37,7 @@ export async function renderNutrition(root) {
 
   // ---- Cuaderno nutricional --------------------------------------------------
   if (menu && slots.length) {
-    root.append(dietPlanCard(menu, slots, items, foods, root));
+    root.append(dietPlanCard(menu, menus, slots, items, foods, root));
   } else {
     const card = el("div", { class: "card" });
     card.append(el("h2", { class: "card__title" }, [icon("utensils", 18), "Tu dieta"]));
@@ -42,6 +45,61 @@ export async function renderNutrition(root) {
     card.append(el("a", { class: "btn btn--primary", href: "#/menus" }, [icon("book", 18), "Menús"]));
     root.append(card);
   }
+}
+
+// ---------------------------------------------------------------------------
+// Switcher de menú: cambiar el activo, renombrarlo, duplicarlo o crear uno
+// nuevo sin salir de Nutrición. "Gestionar menús…" lleva a la vista completa
+// (#/menus) para lo que se usa poco: eliminar, o renombrar uno que no esté activo.
+function openMenuSwitcher(anchor, activeMenu, menus, root) {
+  actionMenu(anchor, [
+    ...menus.map((m) => ({
+      icon: m.id === activeMenu.id ? "check" : "book",
+      label: m.name,
+      onClick: async () => {
+        if (m.id === activeMenu.id) return;
+        try {
+          await Menus.activate(m.id);
+          toast(`Menú activo: ${m.name}`);
+          renderNutrition(root);
+        } catch (e) { showError(e); }
+      },
+    })),
+    {
+      icon: "pencil", label: "Renombrar",
+      onClick: async () => {
+        const name = prompt("Nuevo nombre del menú", activeMenu.name);
+        if (name == null || !name.trim()) return;
+        try { await Menus.update(activeMenu.id, { name: name.trim() }); renderNutrition(root); }
+        catch (e) { showError(e); }
+      },
+    },
+    {
+      icon: "copy", label: "Duplicar",
+      onClick: async () => {
+        try {
+          const activeSlots = await MealSlots.list(activeMenu.id);
+          const copy = await Menus.duplicate(activeMenu, activeSlots);
+          toast(`Duplicado como "${copy.name}"`);
+          renderNutrition(root);
+        } catch (e) { showError(e); }
+      },
+    },
+    {
+      icon: "plus", label: "Nuevo menú",
+      onClick: async () => {
+        const name = prompt("Nombre del nuevo menú (p.ej. Comida fuera)");
+        if (name == null || !name.trim()) return;
+        try {
+          const created = await Menus.insert({ name: name.trim() });
+          await MealSlots.insertMany(DEFAULT_SLOTS.map((s) => ({ ...s, menu_id: created.id })));
+          toast("Menú creado (aún no está activo)");
+          renderNutrition(root);
+        } catch (e) { showError(e); }
+      },
+    },
+    { icon: "folder", label: "Gestionar menús…", onClick: () => navigate("/menus") },
+  ], { title: "Menú" });
 }
 
 // ---------------------------------------------------------------------------
@@ -104,11 +162,29 @@ function fmtAmt(n) {
   return (n ?? 0).toLocaleString("es-ES", { maximumFractionDigits: 1 });
 }
 
-function dietPlanCard(menu, slots, items, foods, root) {
+function dietPlanCard(menu, menus, slots, items, foods, root) {
   const card = el("div", { class: "card" });
-  card.append(el("h2", { class: "card__title" }, [icon("utensils", 18), "Tu dieta"]));
 
-  card.append(el("h3", { class: "sub" }, `Cuaderno nutricional · ${menu.name}`));
+  const switchBtn = el("button", {
+    type: "button", class: "menu-switch", title: "Cambiar de menú",
+  }, [
+    icon("book", 16),
+    el("span", { class: "menu-switch__name" }, menu.name),
+    icon("chevron-down", 14),
+  ]);
+  switchBtn.addEventListener("click", () => openMenuSwitcher(switchBtn, menu, menus, root));
+
+  const libBtn = el("a", {
+    class: "icon-btn", href: "#/foods",
+    title: "Biblioteca de alimentos", "aria-label": "Biblioteca de alimentos",
+  }, icon("package", 18));
+
+  card.append(el("div", { class: "ledger-head" }, [
+    el("h2", { class: "card__title" }, [icon("utensils", 18), "Tu dieta"]),
+    el("div", { class: "ledger-head__actions" }, [libBtn, switchBtn]),
+  ]));
+
+  card.append(el("h3", { class: "sub" }, "Cuaderno nutricional"));
   card.append(el("p", { class: "muted small" },
     "Cambia la cantidad (×1 = ración base), añade o quita alimentos de cada comida, y los totales se recalculan solos."));
 
@@ -297,11 +373,7 @@ function dietPlanCard(menu, slots, items, foods, root) {
       saveBtn.disabled = false;
     }
   });
-  card.append(el("div", { class: "ledger-save" }, [
-    saveBtn,
-    el("a", { class: "btn btn--ghost", href: "#/menus" }, [icon("book", 18), "Menús"]),
-    el("a", { class: "btn btn--ghost", href: "#/foods" }, [icon("package", 18), "Biblioteca de alimentos"]),
-  ]));
+  card.append(el("div", { class: "ledger-save" }, [saveBtn]));
 
   return card;
 }

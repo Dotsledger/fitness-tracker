@@ -255,6 +255,26 @@ export const Menus = {
     );
     return run(sb.from("menus").update({ is_active: true }).eq("id", id).select().single());
   },
+  // Duplica un menú completo: comidas (con su orden) y alimentos de cada
+  // comida, remapeando cada alimento a la comida clonada correspondiente.
+  // Compartido por la vista Menús y el switcher inline de Nutrición.
+  async duplicate(menu, slots) {
+    const copy = await Menus.insert({ name: `${menu.name} (copia)` });
+    const idMap = new Map();
+    for (const s of slots) {
+      const [clone] = await MealSlots.insertMany([{
+        menu_id: copy.id, slot_order: s.slot_order, name: s.name, optional: s.optional,
+      }]);
+      idMap.set(s.id, clone.id);
+    }
+    const items = await MealItems.list(slots.map((s) => s.id));
+    for (const it of items) {
+      await MealItems.insert({
+        meal_slot_id: idMap.get(it.meal_slot_id), food_id: it.food_id, qty: it.qty, item_order: it.item_order,
+      });
+    }
+    return copy;
+  },
 };
 
 // Comidas base con las que nace todo menú nuevo (también al crear un perfil).
