@@ -29,6 +29,9 @@ export async function renderNutrition(root) {
   // ---- Macros calculados ---------------------------------------------------
   root.append(macrosCard(macros));
 
+  // ---- Calculadora de macros (colapsada: se ajusta poco) ---------------------
+  root.append(calculatorCard(profile, latest, root));
+
   // ---- Cuaderno nutricional --------------------------------------------------
   if (menu && slots.length) {
     root.append(dietPlanCard(menu, slots, items, foods, root));
@@ -39,9 +42,6 @@ export async function renderNutrition(root) {
     card.append(el("a", { class: "btn btn--primary", href: "#/menus" }, [icon("book", 18), "Menús"]));
     root.append(card);
   }
-
-  // ---- Calculadora de macros -------------------------------------------------
-  root.append(calculatorCard(profile, latest, root));
 }
 
 // ---------------------------------------------------------------------------
@@ -313,17 +313,24 @@ function dietPlanCard(menu, slots, items, foods, root) {
 // de la app, así la previsualización nunca se desincroniza del cálculo real.
 // "Guardar" persiste en profile para que el resto de la app use estos valores.
 function calculatorCard(profile, latest, root) {
-  const card = el("div", { class: "card" });
-  card.append(el("h2", { class: "card__title" }, [icon("calculator", 18), "Calculadora de macros"]));
+  // No hay nada que ajustar todavía: aviso simple, sin plegar.
+  if (!profile || !latest) {
+    const card = el("div", { class: "card" });
+    card.append(el("h2", { class: "card__title" }, [icon("calculator", 18), "Calculadora de macros"]));
+    card.append(el("p", { class: !profile ? "warn" : "muted" },
+      !profile
+        ? "No hay fila de perfil. Ejecuta db/schema.sql (crea una por defecto)."
+        : "Necesitas una medición de peso (pestaña Cuerpo) para calcular."));
+    return card;
+  }
 
-  if (!profile) {
-    card.append(el("p", { class: "warn" }, "No hay fila de perfil. Ejecuta db/schema.sql (crea una por defecto)."));
-    return card;
-  }
-  if (!latest) {
-    card.append(el("p", { class: "muted" }, "Necesitas una medición de peso (pestaña Cuerpo) para calcular."));
-    return card;
-  }
+  // Se toca poco: colapsada por defecto, se despliega al tocar el título.
+  const card = el("details", { class: "card calc-card" });
+  card.append(el("summary", { class: "calc-summary" }, [
+    icon("calculator", 18),
+    el("span", { class: "calc-summary__title" }, "Calculadora de macros"),
+    icon("chevron-down", 18, { class: "calc-summary__chev" }),
+  ]));
 
   card.append(el("p", { class: "muted small" },
     "Cambia cualquier dial y los totales se recalculan solos. Pulsa Guardar para que el resto de la app use estos valores."));
