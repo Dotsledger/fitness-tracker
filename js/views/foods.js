@@ -10,6 +10,7 @@ import { Foods } from "../db.js";
 import { el, clear, loading, fmt, toast, showError, confirmAction, emptyState } from "../utils.js";
 import { actionMenu, kebabButton } from "../ui.js";
 import { icon } from "../icons.js";
+import { openDishCameraSheet } from "../ai-food.js";
 
 export async function renderFoods(root) {
   loading(root);
@@ -18,6 +19,10 @@ export async function renderFoods(root) {
 
   root.append(el("a", { class: "back-link", href: "#/nutrition" }, [icon("chevron-left", 16), "Nutrición"]));
   root.append(el("h1", { class: "view-title" }, "Biblioteca de alimentos"));
+
+  const aiBtn = el("button", { type: "button", class: "btn" }, [icon("camera", 18), "Estimar con foto"]);
+  aiBtn.addEventListener("click", () => openDishCameraSheet({ onSaved: () => renderFoods(root) }));
+  root.append(el("div", { class: "field--wide", style: "margin-bottom:12px" }, [aiBtn]));
 
   root.append(formCard(root, list));
 
@@ -162,6 +167,7 @@ function foodRow(f, root) {
   ], { title: f.name }));
 
   return el("div", { class: "list-row" + (f.is_active ? "" : " list-row--muted") }, [
+    f.photo_url ? el("img", { src: f.photo_url, class: "list-row__thumb", alt: "" }) : null,
     el("div", { class: "list-row__main" }, [
       el("div", { class: "list-row__title" }, f.name + (f.is_active ? "" : " (inactivo)")),
       el("div", { class: "list-row__sub" }, meta),

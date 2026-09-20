@@ -11,6 +11,29 @@ import { CHART_COLORS } from "../charts.js";
 import { icon } from "../icons.js";
 import { actionMenu } from "../ui.js";
 import { navigate } from "../router.js";
+import { openDishCameraSheet, openMenuCameraSheet } from "../ai-food.js";
+
+// "Cambiar esta comida hoy": duplica el menú activo (Menus.duplicate ya
+// existente), sustituye SOLO los alimentos de la comida elegida por los
+// nuevos, renombra la copia "(hoy)" y la activa. El resto del día queda
+// idéntico al menú original.
+async function swapMealForToday(menu, slots, targetSlot, newFoods, root) {
+  try {
+    const copy = await Menus.duplicate(menu, slots);
+    const copySlots = await MealSlots.list(copy.id);
+    const copyTargetSlot = copySlots.find((s) => s.slot_order === targetSlot.slot_order);
+    const copyItems = await MealItems.list([copyTargetSlot.id]);
+    for (const it of copyItems) await MealItems.remove(it.id);
+    let order = 1;
+    for (const food of newFoods) {
+      await MealItems.insert({ meal_slot_id: copyTargetSlot.id, food_id: food.id, qty: 1, item_order: order++ });
+    }
+    await Menus.update(copy.id, { name: `${menu.name} (hoy)` });
+    await Menus.activate(copy.id);
+    toast(`"${targetSlot.name}" cambiada para hoy`);
+    renderNutrition(root);
+  } catch (err) { showError(err); }
+}
 
 export async function renderNutrition(root) {
   loading(root);
@@ -345,6 +368,33 @@ function dietPlanCard(menu, menus, slots, items, foods, root) {
       toggle.addEventListener("change", () => { section.active = toggle.checked; recalcGrand(); });
       headRight.push(el("label", { class: "ledger-toggle" }, [toggle, "incluir en el total"]));
     }
+
+    const cameraBtn = el("button", {
+      type: "button", class: "icon-btn", title: "Cambiar esta comida hoy", "aria-label": "Cambiar esta comida hoy",
+    }, icon("camera", 18));
+    cameraBtn.addEventListener("click", () => actionMenu(cameraBtn, [
+      {
+        icon: "camera", label: "Foto del plato",
+        onClick: () => openDishCameraSheet({
+          onSaved: (food) => swapMealForToday(menu, slots, slot, [food], root),
+        }),
+      },
+      {
+        icon: "list", label: "Foto de la carta",
+        onClick: () => openMenuCameraSheet({
+          target: { kcal: section.total.kcal, protein: section.total.p, carbs: section.total.h, fat: section.total.g },
+          onSaved: (foodsArr) => swapMealForToday(menu, slots, slot, foodsArr, root),
+        }),
+      },
+      {
+        icon: "package", label: "Elegir de mi biblioteca",
+        children: foods.map((f) => ({
+          label: f.name,
+          onClick: () => swapMealForToday(menu, slots, slot, [f], root),
+        })),
+      },
+    ], { title: `Cambiar hoy: ${slot.name}` }));
+    headRight.push(cameraBtn);
 
     card.append(el("div", { class: "ledger-section" }, [
       el("div", { class: "ledger-section__head" }, [el("h4", { class: "ledger-section__title" }, slot.name), ...headRight]),

@@ -185,7 +185,8 @@ create table if not exists foods (
   protein numeric not null default 0,
   carbs numeric not null default 0,
   fat numeric not null default 0,
-  is_active boolean default true
+  is_active boolean default true,
+  photo_url text                -- foto del plato (cat "🍕 Platos", estimados con IA); bucket food-photos, ver abajo
 );
 
 -- Menús de dieta: varios guardados por perfil (ej. "Estándar", "Comida fuera"),
@@ -218,6 +219,22 @@ create table if not exists meal_items (
   item_order int
 );
 create index if not exists idx_meal_items_slot on meal_items (meal_slot_id, item_order);
+
+-- Bucket de fotos de platos (foods.photo_url). storage.buckets/storage.objects
+-- son tablas Postgres normales: el bucket y sus políticas se crean por SQL,
+-- público en lectura con el mismo criterio "anon_full_access" que el resto del
+-- esquema (app sin login, ver cabecera de este archivo).
+insert into storage.buckets (id, name, public)
+values ('food-photos', 'food-photos', true)
+on conflict (id) do nothing;
+
+drop policy if exists "anon_read_food_photos" on storage.objects;
+create policy "anon_read_food_photos" on storage.objects
+  for select to anon, authenticated using (bucket_id = 'food-photos');
+
+drop policy if exists "anon_write_food_photos" on storage.objects;
+create policy "anon_write_food_photos" on storage.objects
+  for insert to anon, authenticated with check (bucket_id = 'food-photos');
 
 
 -- ============================================================================

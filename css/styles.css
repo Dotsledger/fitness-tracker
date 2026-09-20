@@ -517,6 +517,13 @@ input[type="date"] { font-variant-numeric: tabular-nums; }
 .list-row__sub { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; font-size: 0.85rem; color: var(--muted); margin-top: 1px; }
 .list-row__sub .ico { color: var(--ok); }
 .list-row__actions { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+.list-row__thumb {
+  flex: 0 0 auto;
+  width: 42px; height: 42px;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+}
 .chevron { color: var(--muted); display: inline-flex; }
 .move-sel { min-height: 40px; padding: 6px 26px 6px 10px; width: auto; font-size: 0.85rem; }
 
@@ -904,6 +911,27 @@ input[type="date"] { font-variant-numeric: tabular-nums; }
 }
 .ex-credit { font-size: 0.75rem; color: var(--muted); text-align: center; margin: 14px 0 0; }
 .ex-credit a { color: var(--muted); }
+
+/* Ficha de la IA de comida (foto → macros): mismo bottom-sheet que .ex-sheet,
+   cuerpo propio con foto/nota/ficha editable o combinaciones de menú. */
+.ai-sheet__body { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
+.ai-sheet__img {
+  width: 100%; max-height: 220px; object-fit: cover;
+  border-radius: var(--radius); border: 1px solid var(--border);
+}
+.ai-sheet__combos { display: flex; flex-direction: column; gap: 8px; }
+.ai-sheet__combo {
+  text-align: left;
+  display: flex; flex-direction: column; gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--card-2);
+  cursor: pointer;
+}
+.ai-sheet__combo:active { background: var(--card); }
+.ai-sheet__combo--best { border-color: var(--primary); background: var(--primary-soft); }
+.ai-sheet__combo-items { font-weight: 600; font-size: 0.92rem; }
 
 /* ---- Tirador de arrastre --------------------------------------------------- */
 .drag-handle {
